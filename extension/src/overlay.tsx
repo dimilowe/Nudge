@@ -1,6 +1,6 @@
 import { SponsoredContent, OrganicContent } from './types';
 
-interface ToastOptions {
+interface PanelOptions {
   sponsored?: SponsoredContent;
   organic: OrganicContent;
   intentText: string;
@@ -10,21 +10,51 @@ interface ToastOptions {
   onFeedback: (wasHelpful: boolean, clicked?: 'sponsored' | 'organic') => void;
 }
 
-export function createToastOverlay(options: ToastOptions): HTMLElement {
+interface PanelState {
+  isCollapsed: boolean;
+  position: { x: number; y: number };
+  isDragging: boolean;
+  dragOffset: { x: number; y: number };
+  currentSuggestions: PanelOptions | null;
+}
+
+export function createPersistentPanel(): {
+  container: HTMLElement;
+  showSuggestions: (options: PanelOptions) => void;
+  hideSuggestions: () => void;
+} {
+  // State management
+  const state: PanelState = {
+    isCollapsed: true,
+    position: { x: window.innerWidth - 324, y: window.innerHeight - 424 }, // Default bottom-right
+    isDragging: false,
+    dragOffset: { x: 0, y: 0 },
+    currentSuggestions: null,
+  };
+
+  // Load saved position from storage
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.get(['panelPosition'], (result) => {
+      if (result.panelPosition) {
+        state.position = result.panelPosition;
+        updatePanelPosition();
+      }
+    });
+  }
+
   // Create shadow DOM container
   const container = document.createElement('div');
+  container.id = 'intent-assistant-panel';
   container.style.cssText = `
     position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 999999;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    pointer-events: auto;
+    z-index: 2147483647;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    pointer-events: none;
   `;
 
   const shadowRoot = container.attachShadow({ mode: 'closed' });
   
-  // Create styles
+  // Create styles with glass-morphism
   const style = document.createElement('style');
   style.textContent = `
     * {
@@ -33,29 +63,186 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
       box-sizing: border-box;
     }
     
-    .toast-card {
-      width: 360px;
-      background: #ffffff;
+    .panel-wrapper {
+      position: absolute;
+      pointer-events: auto;
+      transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1),
+                  height 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .panel-wrapper.collapsed {
+      width: 48px;
+      height: 48px;
+    }
+    
+    .panel-wrapper.expanded {
+      width: 300px;
+      height: 400px;
+    }
+    
+    .panel {
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 12px;
       box-shadow: 
-        0 1px 3px rgba(0, 0, 0, 0.05),
-        0 10px 25px -5px rgba(0, 0, 0, 0.1),
-        0 20px 40px -10px rgba(0, 0, 0, 0.08);
-      animation: fadeIn 0.3s ease-in-out;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideInRight 300ms ease-out;
+    }
+    
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .panel-header {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      cursor: move;
+      user-select: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .panel-header:active {
+      cursor: grabbing;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .collapse-btn {
+      background: none;
+      border: none;
+      color: rgba(0, 0, 0, 0.7);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 150ms ease;
+      border-radius: 4px;
+    }
+    
+    .collapse-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: rgba(0, 0, 0, 0.9);
+    }
+    
+    .collapse-icon {
+      width: 16px;
+      height: 16px;
+      transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .collapsed .collapse-icon {
+      transform: rotate(-90deg);
+    }
+    
+    .panel-title {
       font-size: 14px;
-      line-height: 1.5;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.8);
+      opacity: 1;
+      transition: opacity 150ms ease;
     }
     
-    .toast-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 
-        0 2px 4px rgba(0, 0, 0, 0.06),
-        0 15px 30px -5px rgba(0, 0, 0, 0.12),
-        0 25px 50px -10px rgba(0, 0, 0, 0.1);
+    .collapsed .panel-title {
+      opacity: 0;
     }
     
-    @keyframes fadeIn {
+    .close-btn {
+      background: none;
+      border: none;
+      color: rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: all 150ms ease;
+      opacity: 1;
+    }
+    
+    .close-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: rgba(0, 0, 0, 0.9);
+    }
+    
+    .collapsed .close-btn {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px;
+      opacity: 1;
+      transition: opacity 150ms ease;
+    }
+    
+    .collapsed .panel-content {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .panel-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .panel-content::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .panel-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+    
+    .panel-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .suggestions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .suggestion-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 12px;
+      transition: all 150ms ease;
+      animation: fadeInCard 300ms ease-out;
+    }
+    
+    .suggestion-card:hover {
+      transform: scale(1.01);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+    
+    @keyframes fadeInCard {
       from {
         opacity: 0;
         transform: translateY(10px);
@@ -66,174 +253,136 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
       }
     }
     
-    .toast-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 16px;
-      border-bottom: 1px solid hsl(210, 20%, 90%);
-    }
-    
-    .toast-header-content {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      flex: 1;
-    }
-    
-    .toast-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: hsl(217, 91%, 95%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: hsl(217, 91%, 60%);
-      font-size: 16px;
-    }
-    
-    .toast-title {
-      font-weight: 600;
-      font-size: 14px;
-      color: hsl(210, 10%, 23%);
-      margin-bottom: 2px;
-    }
-    
-    .toast-subtitle {
-      font-size: 12px;
-      color: hsl(210, 10%, 45%);
-    }
-    
-    .close-btn {
-      background: none;
-      border: none;
-      color: hsl(210, 10%, 45%);
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      transition: color 0.2s;
-    }
-    
-    .close-btn:hover {
-      color: hsl(210, 10%, 23%);
-    }
-    
-    .sponsored-section {
-      padding: 16px;
-      background: hsl(217, 91%, 95%);
-      background: linear-gradient(135deg, hsl(217, 91%, 95%) 0%, hsl(217, 91%, 97%) 100%);
-    }
-    
-    .organic-section {
-      padding: 16px;
-      border-top: 1px solid hsl(210, 20%, 90%);
-    }
-    
-    .section-badge {
+    .card-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
+      border-radius: 12px;
+      font-size: 10px;
       font-weight: 500;
       margin-bottom: 8px;
     }
     
     .sponsored-badge {
-      background: hsl(217, 91%, 60%);
-      background: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 70%) 100%);
+      background: linear-gradient(135deg, hsl(280, 65%, 60%), hsl(280, 65%, 70%));
       color: white;
-      border: 1px solid hsl(217, 91%, 60%);
     }
     
     .organic-badge {
-      background: hsl(210, 20%, 96%);
-      color: hsl(210, 10%, 45%);
-      border: 1px solid hsl(210, 20%, 90%);
+      background: rgba(0, 0, 0, 0.1);
+      color: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(0, 0, 0, 0.15);
     }
     
-    .section-title {
-      font-weight: 600;
-      font-size: 14px;
-      color: hsl(210, 10%, 23%);
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.9);
       margin-bottom: 4px;
+      line-height: 1.3;
     }
     
-    .section-description {
+    .card-description {
       font-size: 12px;
-      color: hsl(210, 10%, 45%);
-      margin-bottom: 12px;
+      color: rgba(0, 0, 0, 0.6);
+      line-height: 1.4;
+      margin-bottom: 10px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     
-    .cta-btn {
+    .card-cta {
       width: 100%;
       border: none;
-      border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 14px;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 150ms ease;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
     }
     
-    .sponsored-btn {
-      background: hsl(217, 91%, 60%);
+    .sponsored-cta {
+      background: hsl(220, 90%, 56%);
       color: white;
     }
     
-    .sponsored-btn:hover {
-      background: hsl(217, 91%, 55%);
+    .sponsored-cta:hover {
+      background: hsl(220, 90%, 50%);
       transform: translateY(-1px);
     }
     
-    .organic-btn {
-      background: hsl(210, 15%, 40%);
+    .organic-cta {
+      background: rgba(0, 0, 0, 0.7);
       color: white;
     }
     
-    .organic-btn:hover {
-      background: hsl(210, 15%, 35%);
+    .organic-cta:hover {
+      background: rgba(0, 0, 0, 0.85);
       transform: translateY(-1px);
     }
     
-    .section-source {
+    .card-source {
       font-size: 11px;
-      color: hsl(210, 10%, 45%);
-      margin-top: 8px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
+      color: rgba(0, 0, 0, 0.5);
+      margin-top: 6px;
     }
     
-    .toast-footer {
-      padding: 12px 16px 16px;
+    .divider {
+      height: 1px;
+      background: rgba(0, 0, 0, 0.1);
+      margin: 12px 0;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: rgba(0, 0, 0, 0.4);
+      font-size: 12px;
+    }
+    
+    .empty-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .panel-footer {
+      padding: 8px 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      opacity: 1;
+      transition: opacity 150ms ease;
+    }
+    
+    .collapsed .panel-footer {
+      opacity: 0;
+      pointer-events: none;
     }
     
     .suppress-btn {
       background: none;
       border: none;
-      color: hsl(210, 10%, 45%);
+      color: rgba(0, 0, 0, 0.5);
       cursor: pointer;
-      text-decoration: none;
       font-size: 11px;
-      transition: color 0.2s;
+      transition: color 150ms ease;
       display: flex;
       align-items: center;
       gap: 4px;
     }
     
     .suppress-btn:hover {
-      color: hsl(210, 10%, 23%);
+      color: rgba(0, 0, 0, 0.8);
     }
     
     .feedback-buttons {
@@ -244,190 +393,234 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
     .feedback-btn {
       background: none;
       border: none;
-      color: hsl(210, 10%, 45%);
+      color: rgba(0, 0, 0, 0.5);
       cursor: pointer;
       padding: 2px;
-      transition: color 0.2s;
+      transition: color 150ms ease;
+      font-size: 14px;
     }
     
     .feedback-btn:hover {
-      color: hsl(210, 10%, 23%);
+      color: rgba(0, 0, 0, 0.8);
     }
     
-    .progress-bar {
-      height: 4px;
-      background: hsl(210, 20%, 96%);
-      border-radius: 0 0 12px 12px;
-      overflow: hidden;
-    }
-    
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 70%) 100%);
-      width: 100%;
-      animation: progress 12s linear forwards;
-    }
-    
-    @keyframes progress {
-      from { width: 100%; }
-      to { width: 0%; }
-    }
-    
-    .debug-badge {
-      position: absolute;
-      top: -8px;
-      right: 8px;
-      background: hsl(0, 84%, 60%);
-      color: white;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+    .intent-text {
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.4);
+      padding: 0 12px 8px;
+      font-style: italic;
     }
   `;
 
   shadowRoot.appendChild(style);
 
-  // Create toast HTML
-  const toast = document.createElement('div');
-  toast.className = 'toast-card';
+  // Create panel HTML
+  const panelWrapper = document.createElement('div');
+  panelWrapper.className = 'panel-wrapper collapsed';
   
-  // Append toast to shadow root first to ensure it's in DOM tree
-  shadowRoot.appendChild(toast);
+  const panel = document.createElement('div');
+  panel.className = 'panel';
   
-  let html = `
-    <div class="toast-header">
-      <div class="toast-header-content">
-        <div class="toast-icon">✨</div>
-        <div>
-          <div class="toast-title">Help Found</div>
-          <div class="toast-subtitle">Based on: "${options.intentText}"</div>
-        </div>
+  panel.innerHTML = `
+    <div class="panel-header" data-draggable="true">
+      <div class="header-left">
+        <button class="collapse-btn" data-action="toggle-collapse">
+          <svg class="collapse-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 4L10 8L6 12"/>
+          </svg>
+        </button>
+        <span class="panel-title">Suggestions</span>
       </div>
       <button class="close-btn" data-action="close">✕</button>
     </div>
-  `;
-
-  // Sponsored section
-  if (options.sponsored) {
-    html += `
-      <div class="sponsored-section">
-        <div class="section-badge sponsored-badge">
-          💎 Sponsored
+    <div class="panel-content">
+      <div class="suggestions-container">
+        <div class="empty-state">
+          <div class="empty-icon">💡</div>
+          <div>Start typing to see suggestions</div>
         </div>
-        <div class="section-title">${options.sponsored.title}</div>
-        ${options.sponsored.subtitle ? `<div class="section-description">${options.sponsored.subtitle}</div>` : ''}
-        <button class="cta-btn sponsored-btn" data-action="sponsored-click">
-          ${options.sponsored.cta}
-          <span>↗</span>
-        </button>
-        <div class="section-source">
-          🏪 ${options.sponsored.brand}
-        </div>
-      </div>
-    `;
-  }
-
-  // Organic section
-  html += `
-    <div class="organic-section">
-      <div class="section-badge organic-badge">
-        📚 Free Help
-      </div>
-      <div class="section-title">${options.organic.title}</div>
-      ${options.organic.subtitle ? `<div class="section-description">${options.organic.subtitle}</div>` : ''}
-      <button class="cta-btn organic-btn" data-action="organic-click">
-        ${options.organic.cta}
-        <span>→</span>
-      </button>
-      <div class="section-source">
-        🔗 ${options.organic.source}
       </div>
     </div>
-  `;
-
-  // Footer
-  html += `
-    <div class="toast-footer">
+    <div class="panel-footer">
       <button class="suppress-btn" data-action="suppress">
-        🚫 Don't show on this site
+        🚫 Hide on this site
       </button>
       <div class="feedback-buttons">
         <button class="feedback-btn" data-action="thumbs-up" title="Helpful">👍</button>
         <button class="feedback-btn" data-action="thumbs-down" title="Not helpful">👎</button>
       </div>
     </div>
-    <div class="progress-bar">
-      <div class="progress-fill"></div>
-    </div>
   `;
 
-  toast.innerHTML = html;
+  panelWrapper.appendChild(panel);
+  shadowRoot.appendChild(panelWrapper);
 
-  // Add event listeners
-  toast.addEventListener('click', (e) => {
+  // Update panel position
+  function updatePanelPosition() {
+    panelWrapper.style.left = `${state.position.x}px`;
+    panelWrapper.style.top = `${state.position.y}px`;
+  }
+  updatePanelPosition();
+
+  // Drag functionality
+  const header = panel.querySelector('[data-draggable="true"]') as HTMLElement;
+  
+  header.addEventListener('mousedown', (e) => {
+    if ((e.target as HTMLElement).hasAttribute('data-action')) return;
+    
+    state.isDragging = true;
+    state.dragOffset = {
+      x: e.clientX - state.position.x,
+      y: e.clientY - state.position.y,
+    };
+    header.style.cursor = 'grabbing';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!state.isDragging) return;
+    
+    state.position = {
+      x: e.clientX - state.dragOffset.x,
+      y: e.clientY - state.dragOffset.y,
+    };
+    
+    // Constrain to viewport
+    state.position.x = Math.max(0, Math.min(state.position.x, window.innerWidth - (state.isCollapsed ? 48 : 300)));
+    state.position.y = Math.max(0, Math.min(state.position.y, window.innerHeight - (state.isCollapsed ? 48 : 400)));
+    
+    updatePanelPosition();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (state.isDragging) {
+      state.isDragging = false;
+      header.style.cursor = 'move';
+      
+      // Save position
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({ panelPosition: state.position });
+      }
+    }
+  });
+
+  // Event handlers
+  panel.addEventListener('click', (e) => {
     e.stopPropagation();
     const target = e.target as HTMLElement;
     const action = target.getAttribute('data-action');
 
     switch (action) {
+      case 'toggle-collapse':
+        state.isCollapsed = !state.isCollapsed;
+        panelWrapper.classList.toggle('collapsed', state.isCollapsed);
+        break;
+        
       case 'close':
-        options.onClose();
+        hideSuggestions();
         break;
         
       case 'sponsored-click':
-        if (options.sponsored) {
-          options.onFeedback(true, 'sponsored');
-          window.open(options.sponsored.href, '_blank');
-          options.onClose();
+        if (state.currentSuggestions?.sponsored) {
+          state.currentSuggestions.onFeedback(true, 'sponsored');
+          window.open(state.currentSuggestions.sponsored.href, '_blank');
         }
         break;
         
       case 'organic-click':
-        options.onFeedback(true, 'organic');
-        window.open(options.organic.href, '_blank');
-        options.onClose();
+        if (state.currentSuggestions) {
+          state.currentSuggestions.onFeedback(true, 'organic');
+          window.open(state.currentSuggestions.organic.href, '_blank');
+        }
         break;
         
       case 'suppress':
-        options.onSuppressSite();
+        if (state.currentSuggestions) {
+          state.currentSuggestions.onSuppressSite();
+        }
         break;
         
       case 'thumbs-up':
-        options.onFeedback(true);
-        target.style.color = 'hsl(217, 91%, 60%)';
+        if (state.currentSuggestions) {
+          state.currentSuggestions.onFeedback(true);
+          target.style.color = 'hsl(220, 90%, 56%)';
+        }
         break;
         
       case 'thumbs-down':
-        options.onFeedback(false);
-        target.style.color = 'hsl(0, 84%, 60%)';
+        if (state.currentSuggestions) {
+          state.currentSuggestions.onFeedback(false);
+          target.style.color = 'hsl(0, 84%, 60%)';
+        }
         break;
     }
   });
 
-  // Prevent auto-dismiss on hover
-  let hovered = false;
-  toast.addEventListener('mouseenter', () => {
-    hovered = true;
-    const progressFill = toast.querySelector('.progress-fill') as HTMLElement;
-    if (progressFill) {
-      progressFill.style.animationPlayState = 'paused';
+  // Public API
+  function showSuggestions(options: PanelOptions) {
+    state.currentSuggestions = options;
+    
+    const suggestionsContainer = panel.querySelector('.suggestions-container') as HTMLElement;
+    let html = '';
+    
+    // Add intent text
+    html = `<div class="intent-text">Based on: "${options.intentText}"</div>`;
+    
+    // Sponsored card
+    if (options.sponsored) {
+      html += `
+        <div class="suggestion-card">
+          <div class="card-badge sponsored-badge">💎 Sponsored</div>
+          <div class="card-title">${options.sponsored.title}</div>
+          ${options.sponsored.subtitle ? `<div class="card-description">${options.sponsored.subtitle}</div>` : ''}
+          <button class="card-cta sponsored-cta" data-action="sponsored-click">
+            ${options.sponsored.cta}
+            <span>↗</span>
+          </button>
+          <div class="card-source">🏪 ${options.sponsored.brand}</div>
+        </div>
+      `;
     }
-  });
-
-  toast.addEventListener('mouseleave', () => {
-    hovered = false;
-    const progressFill = toast.querySelector('.progress-fill') as HTMLElement;
-    if (progressFill) {
-      progressFill.style.animationPlayState = 'running';
+    
+    // Divider if both exist
+    if (options.sponsored) {
+      html += '<div class="divider"></div>';
     }
-  });
+    
+    // Organic card
+    html += `
+      <div class="suggestion-card">
+        <div class="card-badge organic-badge">📚 Free Resource</div>
+        <div class="card-title">${options.organic.title}</div>
+        ${options.organic.subtitle ? `<div class="card-description">${options.organic.subtitle}</div>` : ''}
+        <button class="card-cta organic-cta" data-action="organic-click">
+          ${options.organic.cta}
+          <span>→</span>
+        </button>
+        <div class="card-source">🔗 ${options.organic.source}</div>
+      </div>
+    `;
+    
+    suggestionsContainer.innerHTML = html;
+    
+    // Auto-expand panel
+    state.isCollapsed = false;
+    panelWrapper.classList.remove('collapsed');
+  }
 
-  return container;
+  function hideSuggestions() {
+    state.currentSuggestions = null;
+    const suggestionsContainer = panel.querySelector('.suggestions-container') as HTMLElement;
+    suggestionsContainer.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">💡</div>
+        <div>Start typing to see suggestions</div>
+      </div>
+    `;
+    
+    // Auto-collapse panel
+    state.isCollapsed = true;
+    panelWrapper.classList.add('collapsed');
+  }
+
+  return { container, showSuggestions, hideSuggestions };
 }
