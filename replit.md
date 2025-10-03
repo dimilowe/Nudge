@@ -100,10 +100,12 @@ Preferred communication style: Simple, everyday language.
 - 15-second rate limiting between toast displays
 
 ### CORS Configuration
-- Backend allows `chrome-extension://` origins for extension requests
+- **Path-based CORS policy** implemented for security:
+  - Extension endpoints (`/api/match`, `/api/feedback`) - Allow ALL origins (content scripts run in webpage context)
+  - Admin endpoints (`/api/cards`, `/api/campaigns`, etc.) - ONLY allow Replit domain and localhost
 - Content Security Policy enforced via Manifest V3
 
-**Design Decision**: Privacy-first approach limits data collection to absolute minimum needed for functionality, giving users granular control over when and where suggestions appear.
+**Design Decision**: Path-based CORS prevents unauthorized data modification while allowing extension to work from any website. Extension endpoints are privacy-safe (only last 6 words + URL origin sent).
 
 # External Dependencies
 
@@ -181,3 +183,13 @@ Preferred communication style: Simple, everyday language.
 - UI includes campaign creation form, campaigns table, status management buttons
 - Demo uses hardcoded advertiser ID "demo-advertiser-123" (production would use authenticated user)
 - Help cards schema already supports campaignId and advertiserId for linking cards to campaigns
+
+**Phase 6 - Chrome Extension Build & CORS Fix** (Completed):
+- Fixed Chrome extension build system: Migrated from Vite to esbuild with IIFE format for browser compatibility
+- Resolved Shadow DOM rendering issues: Removed `process.env.NODE_ENV` checks, fixed element insertion order
+- **Implemented secure path-based CORS policy**:
+  - Extension endpoints (`/api/match`, `/api/feedback`) allow ALL origins (content scripts run in webpage context)
+  - Admin endpoints (`/api/cards`, `/api/campaigns`) restricted to Replit domain only
+  - Prevents unauthorized data modification while enabling extension functionality from any website
+- Extension now fully functional without JavaScript errors or CORS blocks
+- Download endpoint: `/download-extension` serves ready-to-install extension archive
