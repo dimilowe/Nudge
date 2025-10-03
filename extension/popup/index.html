@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intent Assistant Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="popup-root" class="popup-container">
+    <div class="popup-header">
+      <div class="popup-icon">✨</div>
+      <div>
+        <h1 class="popup-title">Intent Assistant</h1>
+        <p class="popup-subtitle">Privacy-friendly help</p>
+      </div>
+    </div>
+
+    <div class="popup-section">
+      <h2 class="section-title">Categories</h2>
+      <div id="categories-list" class="categories-list">
+        <!-- Categories will be populated by popup.js -->
+      </div>
+    </div>
+
+    <div class="popup-section">
+      <h2 class="section-title">Suppressed Sites</h2>
+      <div id="suppressed-sites" class="suppressed-sites">
+        <!-- Sites will be populated by popup.js -->
+      </div>
+      <button id="clear-suppressions" class="clear-btn">Clear All</button>
+    </div>
+
+    <div class="popup-footer">
+      <div class="privacy-note">
+        <span class="privacy-icon">🔒</span>
+        Only last 6 words + URL origin sent
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

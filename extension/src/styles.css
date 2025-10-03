@@ -1,0 +1,14 @@
+/* Content script styles - minimal global impact */
+.intent-assistant-overlay {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 999999 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure our overlay doesn't interfere with page styles */
+.intent-assistant-overlay * {
+  box-sizing: border-box !important;
+}

@@ -1,0 +1,116 @@
+[
+  {
+    "id": "timberland-boots",
+    "intentPhrases": ["timberland boots", "buy timberlands", "timberland sale"],
+    "category": "shopping",
+    "sponsored": {
+      "title": "Kohl's – 20% Off Timberland Boots",
+      "subtitle": "Exclusive coupon today only.",
+      "cta": "Shop Now",
+      "href": "https://www.kohls.com/search.jsp?search=timberland%20boots",
+      "brand": "Kohl's"
+    },
+    "organic": {
+      "title": "How to Clean Timberland Boots",
+      "subtitle": "Step-by-step care guide.",
+      "cta": "Read Guide",
+      "href": "https://www.timberland.com/discover/how-to-clean-boots",
+      "source": "Timberland"
+    }
+  },
+  {
+    "id": "chicken-curry",
+    "intentPhrases": ["chicken curry recipe", "how to make chicken curry", "best chicken curry"],
+    "category": "food",
+    "sponsored": {
+      "title": "Meal Kit – Chicken Curry 20% Off",
+      "subtitle": "Cook a chef-designed curry at home.",
+      "cta": "Get Kit",
+      "href": "https://www.blueapron.com",
+      "brand": "Blue Apron"
+    },
+    "organic": {
+      "title": "BBC Good Food – Chicken Curry",
+      "subtitle": "Rated 4.9/5 by home cooks.",
+      "cta": "Cook Now",
+      "href": "https://www.bbcgoodfood.com/recipes/chicken-curry",
+      "source": "BBC Good Food"
+    }
+  },
+  {
+    "id": "resume-template",
+    "intentPhrases": ["resume template", "cv template", "make a resume"],
+    "category": "jobs",
+    "sponsored": {
+      "title": "Canva Premium Resume Templates",
+      "subtitle": "Stand out in minutes.",
+      "cta": "Try Free",
+      "href": "https://www.canva.com",
+      "brand": "Canva"
+    },
+    "organic": {
+      "title": "Google Docs – Free Resume Template",
+      "subtitle": "Simple & professional.",
+      "cta": "Use Template",
+      "href": "https://docs.google.com",
+      "source": "Google Docs"
+    }
+  },
+  {
+    "id": "crm-smb",
+    "intentPhrases": ["crm for small business", "simple crm", "best free crm"],
+    "category": "saas",
+    "sponsored": {
+      "title": "HubSpot CRM – Free Starter",
+      "subtitle": "All-in-one CRM to grow faster.",
+      "cta": "Start Free",
+      "href": "https://www.hubspot.com",
+      "brand": "HubSpot"
+    },
+    "organic": {
+      "title": "Top 5 Free CRMs for Startups",
+      "subtitle": "Pros & cons compared.",
+      "cta": "Compare Tools",
+      "href": "https://www.g2.com/categories/crm",
+      "source": "G2"
+    }
+  },
+  {
+    "id": "flights-mia",
+    "intentPhrases": ["cheap flights to miami", "fly to miami", "nyc to mia flights"],
+    "category": "travel",
+    "sponsored": {
+      "title": "Expedia – Save on Miami Flights",
+      "subtitle": "Exclusive coupon this week.",
+      "cta": "Book Now",
+      "href": "https://www.expedia.com",
+      "brand": "Expedia"
+    },
+    "organic": {
+      "title": "When to Book Miami Flights",
+      "subtitle": "Timing tips for lowest fares.",
+      "cta": "Read Guide",
+      "href": "https://www.thepointsguy.com",
+      "source": "TPG"
+    }
+  },
+  {
+    "id": "grow-tiktok",
+    "intentPhrases": ["grow my tiktok", "tiktok growth", "more views on tiktok"],
+    "category": "creator",
+    "sponsored": {
+      "title": "Later – TikTok Scheduling & Analytics",
+      "subtitle": "Post at the best time with AI.",
+      "cta": "Try Free",
+      "href": "https://later.com",
+      "brand": "Later"
+    },
+    "organic": {
+      "title": "TikTok Growth Hacks (2025)",
+      "subtitle": "Fresh tactics that work now.",
+      "cta": "Watch Guide",
+      "href": "https://www.youtube.com/results?search_query=tiktok+growth+hacks",
+      "source": "YouTube"
+    }
+  }
+]

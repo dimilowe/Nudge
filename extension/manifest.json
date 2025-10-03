@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Intent Assistant",
+  "version": "1.0.0",
+  "description": "Privacy-friendly assistant that captures user intent and provides helpful sponsored and organic resources",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "Intent Assistant Settings"
+  },
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/overlay.js", "src/styles.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
