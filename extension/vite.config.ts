@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig({
-  root: path.resolve(__dirname, 'src'),
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
@@ -10,13 +9,13 @@ export default defineConfig({
       input: {
         content: path.resolve(__dirname, 'src/content.ts'),
         background: path.resolve(__dirname, 'src/background.ts'),
+        popup: path.resolve(__dirname, 'popup/popup.tsx'),
       },
       output: {
         entryFileNames: '[name].js',
-        format: 'iife'
+        format: 'es'
       }
-    },
-    lib: false,
+    }
   },
   resolve: {
     alias: {

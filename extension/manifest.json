@@ -14,7 +14,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["dist/content.js"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
@@ -23,11 +23,12 @@
     "default_title": "Intent Assistant Settings"
   },
   "background": {
-    "service_worker": "dist/background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "web_accessible_resources": [
     {
-      "resources": ["dist/overlay.js", "src/styles.css"],
+      "resources": ["assets/*"],
       "matches": ["<all_urls>"]
     }
   ]
