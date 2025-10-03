@@ -8,7 +8,7 @@ class IntentCapture {
   private lastToastTime = 0;
   private readonly RATE_LIMIT_MS = 15000; // 15 seconds
   private readonly DEBOUNCE_MS = 500;
-  private readonly API_BASE_URL = 'http://localhost:5000/api';
+  private readonly API_BASE_URL = 'https://ea5b6803-344d-47e5-8427-a61029737083-00-27nkosr42ci4h.janeway.replit.dev/api';
   
   constructor() {
     this.storage = new ExtensionStorage();
