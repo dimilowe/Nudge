@@ -167,3 +167,17 @@ Preferred communication style: Simple, everyday language.
 - Variant analytics endpoint (`/api/analytics/variants`) calculates per-variant metrics
 - Analytics dashboard shows variant comparison: impressions, CTR, feedback rate
 - All data integrity bugs fixed (no duplicates, correct log updates, validation)
+
+**Phase 5 - Advertiser Onboarding Flow** (Completed):
+- Created `/campaigns` page for advertisers to manage advertising campaigns
+- Added campaigns table: id, advertiserId, name, category, budget (cents), spent (cents), status
+- Campaign status flow: draft → active → paused → completed
+- Full CRUD operations: create campaign, list campaigns, update campaign status
+- Budget stored in cents for precision (e.g., $100 = 10000 cents)
+- Campaign API endpoints:
+  - POST /api/campaigns - Create campaign
+  - GET /api/campaigns/advertiser/:advertiserId - List campaigns by advertiser
+  - PUT /api/campaigns/:id - Update campaign fields
+- UI includes campaign creation form, campaigns table, status management buttons
+- Demo uses hardcoded advertiser ID "demo-advertiser-123" (production would use authenticated user)
+- Help cards schema already supports campaignId and advertiserId for linking cards to campaigns
