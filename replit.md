@@ -193,3 +193,21 @@ Preferred communication style: Simple, everyday language.
   - Prevents unauthorized data modification while enabling extension functionality from any website
 - Extension now fully functional without JavaScript errors or CORS blocks
 - Download endpoint: `/download-extension` serves ready-to-install extension archive
+
+**Phase 7 - Persistent Panel Redesign** (Completed):
+- Replaced toast notifications with persistent draggable overlay panel
+- **Panel Features**:
+  - Always mounted (persistent) with collapsible/expandable toggle (default collapsed to 48x48px tab)
+  - Expands to 300x400px when suggestions arrive
+  - Glass-morphism styling (semi-transparent, backdrop blur, subtle border)
+  - Fully draggable with position saved to Chrome storage (remembers location across sessions)
+  - Stacks sponsored + organic suggestion cards vertically with smooth fade transitions
+- **UX Improvements**:
+  - No more annoying pop-ups every few seconds
+  - Users can glance at panel when convenient
+  - Less intrusive (small tab when collapsed)
+  - Better engagement (suggestions don't auto-dismiss)
+- **Technical Fixes**:
+  - Click handler uses `closest()` for nested elements (SVG/span in buttons)
+  - Explicit expanded/collapsed class management for correct 300x400px sizing
+  - Added cardId validation in feedback flow to prevent undefined payloads
