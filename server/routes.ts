@@ -8,12 +8,32 @@ import * as path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // CORS middleware for chrome extension
-  // Allow all origins since content scripts run in webpage context (google.com, etc.)
+  // CORS middleware with security-conscious origin policy
   app.use((req, res, next) => {
     const origin = req.get("origin");
+    const path = req.path;
+    
+    // Extension endpoints - allow all origins (privacy-safe, read-only user data)
+    const extensionEndpoints = ['/api/match', '/api/feedback'];
+    const isExtensionEndpoint = extensionEndpoints.some(endpoint => path.startsWith(endpoint));
+    
     if (origin) {
-      res.header("Access-Control-Allow-Origin", origin);
+      if (isExtensionEndpoint) {
+        // Allow all origins for extension functionality
+        res.header("Access-Control-Allow-Origin", origin);
+      } else {
+        // Admin endpoints - only allow Replit domain and localhost
+        const allowedAdminOrigins = [
+          'https://ea5b6803-344d-47e5-8427-a61029737083-00-27nkosr42ci4h.janeway.replit.dev',
+          'http://localhost:5000',
+          'http://localhost:5173'
+        ];
+        
+        if (allowedAdminOrigins.includes(origin)) {
+          res.header("Access-Control-Allow-Origin", origin);
+        }
+      }
+      
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
