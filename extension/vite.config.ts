@@ -13,8 +13,7 @@ export default defineConfig({
       },
       output: {
         entryFileNames: '[name].js',
-        format: 'iife',
-        inlineDynamicImports: false,
+        format: 'cjs',
       }
     }
   },
