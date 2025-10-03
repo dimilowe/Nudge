@@ -40,17 +40,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find best match
       const matchResult = findBestMatch(intentPhrase, cards);
       
-      // Log the match attempt
-      await storage.createMatchLog({
+      // Log the match attempt and get the log ID
+      const matchLog = await storage.createMatchLog({
         intentText: intentPhrase,
         urlOrigin: new URL(validatedRequest.url).origin,
         cardId: matchResult.cardId || null,
         matchScore: matchResult.score ? Math.round(matchResult.score * 100) : null,
         wasHelpful: null,
         clickedType: null,
+        variant: matchResult.variant || null,
       });
       
-      return res.json(matchResult);
+      // Include logId in response so client can send it back with feedback
+      return res.json({ ...matchResult, logId: matchLog.id });
       
     } catch (error) {
       console.error("Match error:", error);
@@ -66,21 +68,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const feedback = feedbackRequestSchema.parse(req.body);
       
-      // Find the most recent match log for this card
-      const recentLogs = await storage.getMatchLogs(50);
-      const matchLog = recentLogs.find(log => 
-        log.cardId === feedback.cardId && 
-        log.wasHelpful === null
-      );
+      // First, fetch the match log to verify cardId matches
+      const logs = await storage.getMatchLogs(1000);
+      const matchLog = logs.find(log => log.id === feedback.logId);
       
-      if (matchLog) {
-        await storage.createMatchLog({
-          intentText: matchLog.intentText,
-          urlOrigin: matchLog.urlOrigin,
-          cardId: matchLog.cardId,
-          matchScore: matchLog.matchScore,
-          wasHelpful: feedback.wasHelpful,
-          clickedType: feedback.clicked || null,
+      if (!matchLog) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Match log not found" 
+        });
+      }
+      
+      // Verify cardId matches to prevent spoofing
+      if (matchLog.cardId !== feedback.cardId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Card ID mismatch" 
+        });
+      }
+      
+      // Update only the feedback-specific fields
+      const updatedLog = await storage.updateMatchLog(feedback.logId, {
+        wasHelpful: feedback.wasHelpful,
+        clickedType: feedback.clicked || null,
+      });
+      
+      if (!updatedLog) {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Failed to update match log" 
         });
       }
       
@@ -164,6 +180,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ 
         success: false, 
         error: "Failed to fetch analytics" 
+      });
+    }
+  });
+
+  // GET /api/analytics/variants - Get A/B test variant analytics
+  app.get("/api/analytics/variants", async (req, res) => {
+    try {
+      const variantAnalytics = await storage.getVariantAnalytics();
+      return res.json({ success: true, data: variantAnalytics });
+    } catch (error) {
+      console.error("Variant analytics fetch error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to fetch variant analytics" 
       });
     }
   });

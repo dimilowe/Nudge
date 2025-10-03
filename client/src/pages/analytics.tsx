@@ -14,9 +14,24 @@ interface AnalyticsData {
   matchesByDate: Array<{ date: string; count: number }>;
 }
 
+interface VariantAnalytics {
+  variant: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  avgMatchScore: number | null;
+  positivesFeedback: number;
+  negativeFeedback: number;
+  feedbackRate: number;
+}
+
 export default function AnalyticsPage() {
   const { data, isLoading } = useQuery<{ success: boolean; data: AnalyticsData }>({
     queryKey: ["/api/analytics"],
+  });
+
+  const { data: variantsData, isLoading: variantsLoading } = useQuery<{ success: boolean; data: VariantAnalytics[] }>({
+    queryKey: ["/api/analytics/variants"],
   });
 
   if (isLoading) {
@@ -254,6 +269,63 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {!variantsLoading && variantsData?.data && variantsData.data.length > 0 && (
+        <Card data-testid="card-variant-testing">
+          <CardHeader>
+            <CardTitle>A/B Test Variant Performance</CardTitle>
+            <CardDescription>Compare different toast variants</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-3">
+              {variantsData.data.map(variant => (
+                <div 
+                  key={variant.variant} 
+                  className="border rounded-lg p-4 space-y-3"
+                  data-testid={`variant-${variant.variant}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold capitalize text-lg">{variant.variant}</h3>
+                    <span className="text-xs text-muted-foreground">{variant.impressions} views</span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Click-Through Rate</span>
+                      <span className="font-bold" data-testid={`variant-${variant.variant}-ctr`}>
+                        {variant.ctr.toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Avg Match Score</span>
+                      <span className="font-bold">
+                        {variant.avgMatchScore !== null 
+                          ? `${variant.avgMatchScore.toFixed(0)}%` 
+                          : "N/A"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Feedback Rate</span>
+                      <span className="font-bold">
+                        {variant.feedbackRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">👍 {variant.positivesFeedback}</span>
+                        <span className="text-red-600">👎 {variant.negativeFeedback}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

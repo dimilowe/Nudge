@@ -17,6 +17,17 @@ export interface AnalyticsData {
   matchesByDate: Array<{ date: string; count: number }>;
 }
 
+export interface VariantAnalytics {
+  variant: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  avgMatchScore: number | null;
+  positivesFeedback: number;
+  negativeFeedback: number;
+  feedbackRate: number;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -29,8 +40,10 @@ export interface IStorage {
   deleteHelpCard(id: string): Promise<boolean>;
   
   createMatchLog(log: InsertMatchLog): Promise<MatchLog>;
+  updateMatchLog(id: string, updates: Partial<InsertMatchLog>): Promise<MatchLog | undefined>;
   getMatchLogs(limit?: number): Promise<MatchLog[]>;
   getAnalytics(): Promise<AnalyticsData>;
+  getVariantAnalytics(): Promise<VariantAnalytics[]>;
   
   reloadHelpCardsFromJSON(): Promise<number>;
 }
@@ -99,6 +112,15 @@ export class DbStorage implements IStorage {
 
   async createMatchLog(insertLog: InsertMatchLog): Promise<MatchLog> {
     const result = await db.insert(matchLogs).values(insertLog).returning();
+    return result[0];
+  }
+
+  async updateMatchLog(id: string, updates: Partial<InsertMatchLog>): Promise<MatchLog | undefined> {
+    const result = await db
+      .update(matchLogs)
+      .set(updates)
+      .where(eq(matchLogs.id, id))
+      .returning();
     return result[0];
   }
 
@@ -199,6 +221,52 @@ export class DbStorage implements IStorage {
       topIntents,
       matchesByDate
     };
+  }
+
+  async getVariantAnalytics(): Promise<VariantAnalytics[]> {
+    const logs = await db.select().from(matchLogs);
+    const variantStatsMap = new Map<string, {
+      impressions: number;
+      clicks: number;
+      scores: number[];
+      positiveFeedback: number;
+      negativeFeedback: number;
+    }>();
+
+    logs.forEach(log => {
+      if (log.variant) {
+        const stats = variantStatsMap.get(log.variant) || {
+          impressions: 0,
+          clicks: 0,
+          scores: [],
+          positiveFeedback: 0,
+          negativeFeedback: 0
+        };
+
+        stats.impressions++;
+        if (log.clickedType) stats.clicks++;
+        if (log.matchScore !== null) stats.scores.push(log.matchScore);
+        if (log.wasHelpful === true) stats.positiveFeedback++;
+        if (log.wasHelpful === false) stats.negativeFeedback++;
+
+        variantStatsMap.set(log.variant, stats);
+      }
+    });
+
+    return Array.from(variantStatsMap.entries()).map(([variant, stats]) => ({
+      variant,
+      impressions: stats.impressions,
+      clicks: stats.clicks,
+      ctr: stats.impressions > 0 ? (stats.clicks / stats.impressions) * 100 : 0,
+      avgMatchScore: stats.scores.length > 0
+        ? stats.scores.reduce((sum, score) => sum + score, 0) / stats.scores.length
+        : null,
+      positivesFeedback: stats.positiveFeedback,
+      negativeFeedback: stats.negativeFeedback,
+      feedbackRate: stats.impressions > 0
+        ? ((stats.positiveFeedback + stats.negativeFeedback) / stats.impressions) * 100
+        : 0
+    }));
   }
 
   async reloadHelpCardsFromJSON(): Promise<number> {

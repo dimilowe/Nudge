@@ -111,6 +111,7 @@ export interface MatchResult {
   score?: number;
   sponsored?: any;
   organic?: any;
+  variant?: "control" | "compact" | "detailed";
 }
 
 export function findBestMatch(userIntent: string, cards: HelpCard[]): MatchResult {
@@ -134,12 +135,17 @@ export function findBestMatch(userIntent: string, cards: HelpCard[]): MatchResul
     return { matched: false };
   }
   
+  // Randomly assign A/B test variant
+  const variants: Array<"control" | "compact" | "detailed"> = ["control", "compact", "detailed"];
+  const variant = variants[Math.floor(Math.random() * variants.length)];
+  
   return {
     matched: true,
     cardId: bestCard.id,
     score: bestScore,
     sponsored: bestCard.sponsored,
     organic: bestCard.organic,
+    variant,
   };
 }
 

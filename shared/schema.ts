@@ -27,6 +27,7 @@ export const matchLogs = pgTable("match_logs", {
   matchScore: integer("match_score"),
   wasHelpful: boolean("was_helpful"),
   clickedType: text("clicked_type"), // 'sponsored' | 'organic' | null
+  variant: text("variant"), // 'control' | 'compact' | 'detailed' | null
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
@@ -79,6 +80,7 @@ export const matchRequestSchema = z.object({
 });
 
 export const feedbackRequestSchema = z.object({
+  logId: z.string(),
   cardId: z.string(),
   wasHelpful: z.boolean(),
   clicked: z.enum(["sponsored", "organic"]).optional(),
