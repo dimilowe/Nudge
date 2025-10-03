@@ -1,9 +1,9 @@
-import { type User, type InsertUser, type HelpCard, type InsertHelpCard, type MatchLog, type InsertMatchLog } from "@shared/schema";
+import { type User, type InsertUser, type HelpCard, type InsertHelpCard, type MatchLog, type InsertMatchLog, type Campaign, type InsertCampaign } from "@shared/schema";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { db } from "./db";
-import { users, helpCards, matchLogs } from "@shared/schema";
+import { users, helpCards, matchLogs, campaigns } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
 export interface AnalyticsData {
@@ -36,7 +36,7 @@ export interface IStorage {
   getAllHelpCards(): Promise<HelpCard[]>;
   getHelpCard(id: string): Promise<HelpCard | undefined>;
   createHelpCard(card: InsertHelpCard): Promise<HelpCard>;
-  updateHelpCard(id: string, updates: Partial<InsertHelpCard>): Promise<HelpCard>;
+  updateHelpCard(id: string, updates: Partial<InsertHelpCard>): Promise<HelpCard | undefined>;
   deleteHelpCard(id: string): Promise<boolean>;
   
   createMatchLog(log: InsertMatchLog): Promise<MatchLog>;
@@ -44,6 +44,11 @@ export interface IStorage {
   getMatchLogs(limit?: number): Promise<MatchLog[]>;
   getAnalytics(): Promise<AnalyticsData>;
   getVariantAnalytics(): Promise<VariantAnalytics[]>;
+  
+  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  getCampaign(id: string): Promise<Campaign | undefined>;
+  getCampaignsByAdvertiser(advertiserId: string): Promise<Campaign[]>;
+  updateCampaign(id: string, updates: Partial<InsertCampaign>): Promise<Campaign | undefined>;
   
   reloadHelpCardsFromJSON(): Promise<number>;
 }
@@ -267,6 +272,33 @@ export class DbStorage implements IStorage {
         ? ((stats.positiveFeedback + stats.negativeFeedback) / stats.impressions) * 100
         : 0
     }));
+  }
+
+  async createCampaign(insertCampaign: InsertCampaign): Promise<Campaign> {
+    const result = await db.insert(campaigns).values(insertCampaign).returning();
+    return result[0];
+  }
+
+  async getCampaign(id: string): Promise<Campaign | undefined> {
+    const result = await db.select().from(campaigns).where(eq(campaigns.id, id));
+    return result[0];
+  }
+
+  async getCampaignsByAdvertiser(advertiserId: string): Promise<Campaign[]> {
+    return await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.advertiserId, advertiserId))
+      .orderBy(desc(campaigns.createdAt));
+  }
+
+  async updateCampaign(id: string, updates: Partial<InsertCampaign>): Promise<Campaign | undefined> {
+    const result = await db
+      .update(campaigns)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(campaigns.id, id))
+      .returning();
+    return result[0];
   }
 
   async reloadHelpCardsFromJSON(): Promise<number> {

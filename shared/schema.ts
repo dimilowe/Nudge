@@ -15,6 +15,8 @@ export const helpCards = pgTable("help_cards", {
   category: text("category").notNull(),
   sponsored: jsonb("sponsored"),
   organic: jsonb("organic").notNull(),
+  campaignId: varchar("campaign_id"), // nullable for seeded cards
+  advertiserId: varchar("advertiser_id"), // nullable for seeded cards
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -29,6 +31,18 @@ export const matchLogs = pgTable("match_logs", {
   clickedType: text("clicked_type"), // 'sponsored' | 'organic' | null
   variant: text("variant"), // 'control' | 'compact' | 'detailed' | null
   timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const campaigns = pgTable("campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  advertiserId: varchar("advertiser_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  budget: integer("budget").notNull(), // in cents
+  spent: integer("spent").notNull().default(0), // in cents
+  status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'paused' | 'completed'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Help Card Types
@@ -72,6 +86,12 @@ export const insertMatchLogSchema = createInsertSchema(matchLogs).omit({
   timestamp: true,
 });
 
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const matchRequestSchema = z.object({
   text: z.string().min(1).max(200),
   url: z.string().url(),
@@ -86,6 +106,12 @@ export const feedbackRequestSchema = z.object({
   clicked: z.enum(["sponsored", "organic"]).optional(),
 });
 
+export const campaignSchema = z.object({
+  name: z.string().min(1).max(100),
+  category: z.enum(["shopping", "food", "jobs", "saas", "travel", "creator"]),
+  budget: z.number().min(100), // minimum $1 in cents
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -93,8 +119,11 @@ export type InsertHelpCard = z.infer<typeof insertHelpCardSchema>;
 export type HelpCard = typeof helpCards.$inferSelect;
 export type InsertMatchLog = z.infer<typeof insertMatchLogSchema>;
 export type MatchLog = typeof matchLogs.$inferSelect;
+export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+export type Campaign = typeof campaigns.$inferSelect;
 export type MatchRequest = z.infer<typeof matchRequestSchema>;
 export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>;
 export type SponsoredContent = z.infer<typeof sponsoredSchema>;
 export type OrganicContent = z.infer<typeof organicSchema>;
 export type HelpCardData = z.infer<typeof helpCardSchema>;
+export type CampaignFormData = z.infer<typeof campaignSchema>;

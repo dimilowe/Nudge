@@ -252,6 +252,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/campaigns - Create a new campaign
+  app.post("/api/campaigns", async (req, res) => {
+    try {
+      const campaign = await storage.createCampaign(req.body);
+      return res.json({ success: true, campaign });
+    } catch (error) {
+      console.error("Campaign creation error:", error);
+      return res.status(400).json({ 
+        success: false, 
+        error: "Failed to create campaign" 
+      });
+    }
+  });
+
+  // GET /api/campaigns/advertiser/:advertiserId - Get campaigns by advertiser
+  app.get("/api/campaigns/advertiser/:advertiserId", async (req, res) => {
+    try {
+      const campaigns = await storage.getCampaignsByAdvertiser(req.params.advertiserId);
+      return res.json({ success: true, campaigns });
+    } catch (error) {
+      console.error("Campaigns fetch error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to fetch campaigns" 
+      });
+    }
+  });
+
+  // PUT /api/campaigns/:id - Update a campaign
+  app.put("/api/campaigns/:id", async (req, res) => {
+    try {
+      const campaign = await storage.updateCampaign(req.params.id, req.body);
+      if (!campaign) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Campaign not found" 
+        });
+      }
+      return res.json({ success: true, campaign });
+    } catch (error) {
+      console.error("Campaign update error:", error);
+      return res.status(400).json({ 
+        success: false, 
+        error: "Failed to update campaign" 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

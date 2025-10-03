@@ -7,7 +7,8 @@ import NotFound from "@/pages/not-found";
 import ExtensionDemo from "@/pages/extension-demo";
 import AnalyticsPage from "@/pages/analytics";
 import AdminPage from "@/pages/admin";
-import { BarChart3, Home, Settings } from "lucide-react";
+import CampaignsPage from "@/pages/campaigns";
+import { BarChart3, Home, Settings, Megaphone } from "lucide-react";
 
 function Navigation() {
   const [location] = useLocation();
@@ -16,6 +17,7 @@ function Navigation() {
     { path: "/", label: "Demo", icon: Home },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
     { path: "/admin", label: "Admin", icon: Settings },
+    { path: "/campaigns", label: "Campaigns", icon: Megaphone },
   ];
 
   return (
@@ -59,6 +61,7 @@ function Router() {
         <Route path="/" component={ExtensionDemo} />
         <Route path="/analytics" component={AnalyticsPage} />
         <Route path="/admin" component={AdminPage} />
+        <Route path="/campaigns" component={CampaignsPage} />
         <Route component={NotFound} />
       </Switch>
     </>
