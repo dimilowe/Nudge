@@ -1,0 +1,229 @@
+Replit Prompt: Build “Intent Assistant” MVP (Keystrokes → Toast with Paid + Organic Help)
+Goal:
+Create a minimal, privacy-friendly prototype of an “Ads as Help” engine:
+Capture typed intent (keystrokes) on any webpage (extension, content script).
+Match to a small keyword DB (served by a Node/Express API).
+Render a toast overlay showing Sponsored (paid) + Free Help (organic).
+No heavy AI—just exact & fuzzy string match.
+Stack
+Chrome Extension (Manifest V3): content script for keystrokes, overlay UI injected with Shadow DOM.
+Frontend (Vanilla TS + Vite) for the toast card bundle (built and copied into extension).
+Backend: Node + Express with a tiny in-memory DB (JSON). Add simple fuzzy matching.
+Typescript everywhere. No DB install required.
+Features (MVP)
+Keystroke Intent Capture
+Listen to input/keyup on text inputs and textareas.
+Debounce 500ms; extract last 6 words typed as the “intent phrase”.
+POST to /match with { text, url, ts, locale }.
+Match Service (Backend)
+Seed 6 demo intents:
+“timberland boots”
+“chicken curry recipe”
+“resume template”
+“crm for small business”
+“cheap flights to miami”
+“grow my tiktok”
+Each intent has:
+type HelpCard = {
+  id: string;
+  intentPhrases: string[]; // keywords/aliases
+  category: "shopping" | "food" | "jobs" | "saas" | "travel" | "creator";
+  sponsored?: {
+    title: string; subtitle?: string; cta: string; href: string; brand: string;
+  };
+  organic: {
+    title: string; subtitle?: string; cta: string; href: string; source: string;
+  };
+}
+Matching:
+Exact includes on normalized text.
+Fuzzy: Jaro–Winkler or token overlap ≥ 0.6 on any intentPhrases.
+Return best match {sponsored?, organic}; prefer sponsored if present.
+Toast Overlay UI
+Shadow DOM container bottom-right.
+Card shows:
+“Sponsored Help” (if exists): title, subtitle, CTA button, tiny “Sponsored” badge.
+Divider.
+“Free Help”: title, subtitle, CTA.
+Close (×) and “Don’t show this again for this site” link (store per-host in chrome.storage.local).
+Autodismiss after 12s unless hovered/focused.
+Privacy Guardrails (MVP)
+Only send last 6 words + page URL origin; never full page text.
+Add a simple intent category toggle (context-menu) to enable/disable categories.
+Add a red “DEBUG” badge in dev mode; hide in prod.
+Local Admin (JSON)
+seed/help-cards.json with the 6 examples below.
+/reload endpoint to hot-reload JSON without redeploy.
+File Structure
+/extension
+  /src
+    content.ts            // keystroke capture + post to API + render toast
+    overlay.tsx           // toast card (preact or vanilla TS)
+    styles.css
+    storage.ts            // site suppressions + category toggles
+  manifest.json
+  vite.config.ts
+/server
+  index.ts                // Express app
+  match.ts                // normalize + score + choose best card
+  types.ts
+  /seed/help-cards.json
+package.json
+README.md
+Seed Data (examples)
+Put this in /server/seed/help-cards.json:
+[
+  {
+    "id": "timberland-boots",
+    "intentPhrases": ["timberland boots", "buy timberlands", "timberland sale"],
+    "category": "shopping",
+    "sponsored": {
+      "title": "Kohl’s – 20% Off Timberland Boots",
+      "subtitle": "Exclusive coupon today only.",
+      "cta": "Shop Now",
+      "href": "https://www.kohls.com/search.jsp?search=timberland%20boots",
+      "brand": "Kohl's"
+    },
+    "organic": {
+      "title": "How to Clean Timberland Boots",
+      "subtitle": "Step-by-step care guide.",
+      "cta": "Read Guide",
+      "href": "https://www.timberland.com/discover/how-to-clean-boots",
+      "source": "Timberland"
+    }
+  },
+  {
+    "id": "chicken-curry",
+    "intentPhrases": ["chicken curry recipe", "how to make chicken curry", "best chicken curry"],
+    "category": "food",
+    "sponsored": {
+      "title": "Meal Kit – Chicken Curry 20% Off",
+      "subtitle": "Cook a chef-designed curry at home.",
+      "cta": "Get Kit",
+      "href": "https://www.blueapron.com",
+      "brand": "Blue Apron"
+    },
+    "organic": {
+      "title": "BBC Good Food – Chicken Curry",
+      "subtitle": "Rated 4.9/5 by home cooks.",
+      "cta": "Cook Now",
+      "href": "https://www.bbcgoodfood.com/recipes/chicken-curry",
+      "source": "BBC Good Food"
+    }
+  },
+  {
+    "id": "resume-template",
+    "intentPhrases": ["resume template", "cv template", "make a resume"],
+    "category": "jobs",
+    "sponsored": {
+      "title": "Canva Premium Resume Templates",
+      "subtitle": "Stand out in minutes.",
+      "cta": "Try Free",
+      "href": "https://www.canva.com",
+      "brand": "Canva"
+    },
+    "organic": {
+      "title": "Google Docs – Free Resume Template",
+      "subtitle": "Simple & professional.",
+      "cta": "Use Template",
+      "href": "https://docs.google.com",
+      "source": "Google Docs"
+    }
+  },
+  {
+    "id": "crm-smb",
+    "intentPhrases": ["crm for small business", "simple crm", "best free crm"],
+    "category": "saas",
+    "sponsored": {
+      "title": "HubSpot CRM – Free Starter",
+      "subtitle": "All-in-one CRM to grow faster.",
+      "cta": "Start Free",
+      "href": "https://www.hubspot.com",
+      "brand": "HubSpot"
+    },
+    "organic": {
+      "title": "Top 5 Free CRMs for Startups",
+      "subtitle": "Pros & cons compared.",
+      "cta": "Compare Tools",
+      "href": "https://www.g2.com/categories/crm",
+      "source": "G2"
+    }
+  },
+  {
+    "id": "flights-mia",
+    "intentPhrases": ["cheap flights to miami", "fly to miami", "nyc to mia flights"],
+    "category": "travel",
+    "sponsored": {
+      "title": "Expedia – Save on Miami Flights",
+      "subtitle": "Exclusive coupon this week.",
+      "cta": "Book Now",
+      "href": "https://www.expedia.com",
+      "brand": "Expedia"
+    },
+    "organic": {
+      "title": "When to Book Miami Flights",
+      "subtitle": "Timing tips for lowest fares.",
+      "cta": "Read Guide",
+      "href": "https://www.thepointsguy.com",
+      "source": "TPG"
+    }
+  },
+  {
+    "id": "grow-tiktok",
+    "intentPhrases": ["grow my tiktok", "tiktok growth", "more views on tiktok"],
+    "category": "creator",
+    "sponsored": {
+      "title": "Later – TikTok Scheduling & Analytics",
+      "subtitle": "Post at the best time with AI.",
+      "cta": "Try Free",
+      "href": "https://later.com",
+      "brand": "Later"
+    },
+    "organic": {
+      "title": "TikTok Growth Hacks (2025)",
+      "subtitle": "Fresh tactics that work now.",
+      "cta": "Watch Guide",
+      "href": "https://www.youtube.com/results?search_query=tiktok+growth+hacks",
+      "source": "YouTube"
+    }
+  }
+]
+API Requirements
+POST /match → { text, url } → returns { sponsored?, organic }.
+POST /feedback → { cardId, wasHelpful: boolean } to log feedback (store in memory).
+POST /reload → reload JSON seed (dev only).
+Add CORS for chrome-extension://*.
+Matching Logic (pseudo)
+// normalize: lowercase, strip punctuation
+// score = max over phrases of (exactInclude ? 1 : jaroWinkler >= .82 ? 0.8 : tokenOverlap >= .6 ? 0.6 : 0)
+Return the highest scoring card with:
+If sponsored exists → include it as first card.
+Always include organic as second card.
+Extension Manifest (MV3)
+Content script: "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle".
+Permissions: "storage", "activeTab".
+Optional contextMenus to toggle categories on/off (store booleans in chrome.storage.local).
+Build & Run
+One Replit project with two workspaces or one monorepo:
+npm run dev:server → starts Express on http://localhost:4000
+npm run dev:ext → builds content/overlay bundle into /extension/dist
+Load unpacked extension from /extension in Chrome.
+Visit any site with a text box and type:
+“timberland boots”
+“chicken curry recipe”
+“resume template”
+etc.
+Expect a toast within ~0.5–1.0s.
+Nice-to-Have (if time permits)
+Rate limiting: don’t show more than 1 toast per 15s.
+Per-site suppression: “Don’t show on this site again”.
+Category toggles (creator, travel, shopping, food, jobs, saas).
+Minimal telemetry: count matches & clicks (console + memory).
+Acceptance Criteria
+✅ Typing a seeded phrase triggers a toast with Sponsored + Free Help.
+✅ Closing/suppressing toasts works; suppression persists per site.
+✅ Backend returns matches via exact/fuzzy rules.
+✅ No page styles are broken (Shadow DOM + isolated CSS).
+✅ No full-screen capture or invasive data—only last 6 words are sent.
+Deliverables: working Chrome MV3 extension + Node API with seeded matches; clear README with install/test steps.
+Design language: minimal, friendly, utility-first. This is an assistant, not an ad pop-up.
