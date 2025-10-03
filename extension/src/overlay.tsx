@@ -298,6 +298,9 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
   const toast = document.createElement('div');
   toast.className = 'toast-card';
   
+  // Append toast to shadow root first to ensure it's in DOM tree
+  shadowRoot.appendChild(toast);
+  
   let html = `
     <div class="toast-header">
       <div class="toast-header-content">
@@ -426,6 +429,5 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
     }
   });
 
-  shadowRoot.appendChild(toast);
   return container;
 }
