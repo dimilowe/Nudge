@@ -9,9 +9,10 @@ import * as path from "path";
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // CORS middleware for chrome extension
+  // Allow all origins since content scripts run in webpage context (google.com, etc.)
   app.use((req, res, next) => {
     const origin = req.get("origin");
-    if (origin && origin.startsWith("chrome-extension://")) {
+    if (origin) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
