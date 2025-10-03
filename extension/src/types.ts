@@ -29,6 +29,7 @@ export interface MatchResult {
   organic?: OrganicContent;
   message?: string;
   error?: string;
+  logId?: string;
 }
 
 export interface FeedbackRequest {

@@ -1,14 +1,14 @@
 import { ExtensionStorage } from './storage';
-import { createToastOverlay } from './overlay';
+import { createPersistentPanel } from './overlay';
 import type { MatchRequest, MatchResult } from './types';
 
 class IntentCapture {
   private storage: ExtensionStorage;
   private debounceTimer: number | null = null;
-  private lastToastTime = 0;
-  private readonly RATE_LIMIT_MS = 15000; // 15 seconds
   private readonly DEBOUNCE_MS = 500;
   private readonly API_BASE_URL = 'https://ea5b6803-344d-47e5-8427-a61029737083-00-27nkosr42ci4h.janeway.replit.dev/api';
+  private panel: ReturnType<typeof createPersistentPanel> | null = null;
+  private currentLogId: string | null = null;
   
   constructor() {
     this.storage = new ExtensionStorage();
@@ -16,6 +16,10 @@ class IntentCapture {
   }
 
   private async init() {
+    // Create persistent panel once
+    this.panel = createPersistentPanel();
+    document.body.appendChild(this.panel.container);
+    
     // Add event listeners for input capture
     document.addEventListener('input', this.handleInput.bind(this));
     document.addEventListener('keyup', this.handleKeyup.bind(this));
@@ -88,12 +92,6 @@ class IntentCapture {
 
   private async processIntent(fullText: string) {
     try {
-      // Rate limiting check
-      const now = Date.now();
-      if (now - this.lastToastTime < this.RATE_LIMIT_MS) {
-        return;
-      }
-
       // Check if site is suppressed
       const currentOrigin = window.location.origin;
       const isSupressed = await this.storage.isSiteSuppressed(currentOrigin);
@@ -109,6 +107,7 @@ class IntentCapture {
       if (enabledCategories.length === 0) return;
 
       // Make API request
+      const now = Date.now();
       const matchRequest: MatchRequest = {
         text: lastWords,
         url: window.location.href,
@@ -131,12 +130,14 @@ class IntentCapture {
 
       const matchResult: MatchResult = await response.json();
       
+      // Store logId for feedback
+      if (matchResult.logId) {
+        this.currentLogId = matchResult.logId;
+      }
+      
       if (matchResult.matched && (matchResult.sponsored || matchResult.organic)) {
-        // Update rate limiting
-        this.lastToastTime = now;
-        
-        // Show toast overlay
-        await this.showToast(matchResult, lastWords);
+        // Show suggestions in persistent panel
+        await this.showSuggestions(matchResult, lastWords);
       }
 
     } catch (error) {
@@ -144,52 +145,49 @@ class IntentCapture {
     }
   }
 
-  private async showToast(matchResult: MatchResult, intentText: string) {
+  private async showSuggestions(matchResult: MatchResult, intentText: string) {
     try {
-      if (!matchResult.organic) {
-        console.error('Missing organic content');
+      if (!matchResult.organic || !this.panel) {
+        console.error('Missing organic content or panel not initialized');
         return;
       }
       
-      const toastOverlay = createToastOverlay({
+      this.panel.showSuggestions({
         sponsored: matchResult.sponsored,
         organic: matchResult.organic,
         intentText,
         cardId: matchResult.cardId,
         onClose: () => {
-          toastOverlay.remove();
+          this.panel?.hideSuggestions();
         },
         onSuppressSite: async () => {
           await this.storage.suppressSite(window.location.origin);
-          toastOverlay.remove();
+          this.panel?.hideSuggestions();
         },
         onFeedback: async (wasHelpful: boolean, clicked?: 'sponsored' | 'organic') => {
           await this.sendFeedback(matchResult.cardId!, wasHelpful, clicked);
         }
       });
 
-      document.body.appendChild(toastOverlay);
-
-      // Auto-dismiss after 12 seconds
-      setTimeout(() => {
-        if (document.body.contains(toastOverlay)) {
-          toastOverlay.remove();
-        }
-      }, 12000);
-
     } catch (error) {
-      console.error('Toast display failed:', error);
+      console.error('Panel display failed:', error);
     }
   }
 
   private async sendFeedback(cardId: string, wasHelpful: boolean, clicked?: 'sponsored' | 'organic') {
     try {
+      if (!this.currentLogId) {
+        console.error('No logId available for feedback');
+        return;
+      }
+      
       await fetch(`${this.API_BASE_URL}/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          logId: this.currentLogId,
           cardId,
           wasHelpful,
           clicked
