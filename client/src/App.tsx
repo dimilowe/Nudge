@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import ExtensionDemo from "@/pages/extension-demo";
 import AnalyticsPage from "@/pages/analytics";
-import { BarChart3, Home } from "lucide-react";
+import AdminPage from "@/pages/admin";
+import { BarChart3, Home, Settings } from "lucide-react";
 
 function Navigation() {
   const [location] = useLocation();
@@ -14,6 +15,7 @@ function Navigation() {
   const navItems = [
     { path: "/", label: "Demo", icon: Home },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
+    { path: "/admin", label: "Admin", icon: Settings },
   ];
 
   return (
@@ -56,6 +58,7 @@ function Router() {
       <Switch>
         <Route path="/" component={ExtensionDemo} />
         <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
     </>

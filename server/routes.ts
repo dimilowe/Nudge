@@ -168,6 +168,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/cards - Create a new help card
+  app.post("/api/cards", async (req, res) => {
+    try {
+      const card = await storage.createHelpCard(req.body);
+      return res.json({ success: true, card });
+    } catch (error) {
+      console.error("Card creation error:", error);
+      return res.status(400).json({ 
+        success: false, 
+        error: "Failed to create help card" 
+      });
+    }
+  });
+
+  // PUT /api/cards/:id - Update a help card
+  app.put("/api/cards/:id", async (req, res) => {
+    try {
+      const card = await storage.updateHelpCard(req.params.id, req.body);
+      if (!card) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Help card not found" 
+        });
+      }
+      return res.json({ success: true, card });
+    } catch (error) {
+      console.error("Card update error:", error);
+      return res.status(400).json({ 
+        success: false, 
+        error: "Failed to update help card" 
+      });
+    }
+  });
+
+  // DELETE /api/cards/:id - Delete a help card
+  app.delete("/api/cards/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteHelpCard(req.params.id);
+      if (!success) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Help card not found" 
+        });
+      }
+      return res.json({ success: true, message: "Card deleted successfully" });
+    } catch (error) {
+      console.error("Card deletion error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to delete help card" 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
