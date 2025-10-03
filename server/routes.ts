@@ -154,6 +154,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/analytics - Get analytics data
+  app.get("/api/analytics", async (req, res) => {
+    try {
+      const analytics = await storage.getAnalytics();
+      return res.json({ success: true, data: analytics });
+    } catch (error) {
+      console.error("Analytics fetch error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to fetch analytics" 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

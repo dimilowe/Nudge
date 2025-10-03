@@ -6,6 +6,17 @@ import { db } from "./db";
 import { users, helpCards, matchLogs } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
+export interface AnalyticsData {
+  totalMatches: number;
+  successfulMatches: number;
+  clickThroughRate: number;
+  averageMatchScore: number | null;
+  topCards: Array<{ cardId: string; matchCount: number; clickCount: number; ctr: number }>;
+  categoryStats: Array<{ category: string; matchCount: number; clickCount: number; ctr: number }>;
+  topIntents: Array<{ intent: string; count: number }>;
+  matchesByDate: Array<{ date: string; count: number }>;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -14,11 +25,12 @@ export interface IStorage {
   getAllHelpCards(): Promise<HelpCard[]>;
   getHelpCard(id: string): Promise<HelpCard | undefined>;
   createHelpCard(card: InsertHelpCard): Promise<HelpCard>;
-  updateHelpCard(id: string, updates: Partial<InsertHelpCard>): Promise<HelpCard | undefined>;
+  updateHelpCard(id: string, updates: Partial<InsertHelpCard>): Promise<HelpCard>;
   deleteHelpCard(id: string): Promise<boolean>;
   
   createMatchLog(log: InsertMatchLog): Promise<MatchLog>;
   getMatchLogs(limit?: number): Promise<MatchLog[]>;
+  getAnalytics(): Promise<AnalyticsData>;
   
   reloadHelpCardsFromJSON(): Promise<number>;
 }
@@ -96,6 +108,97 @@ export class DbStorage implements IStorage {
       .from(matchLogs)
       .orderBy(desc(matchLogs.timestamp))
       .limit(limit);
+  }
+
+  async getAnalytics(): Promise<AnalyticsData> {
+    const logs = await db.select().from(matchLogs);
+    const cards = await db.select().from(helpCards);
+    
+    const totalMatches = logs.length;
+    const successfulMatches = logs.filter(log => log.cardId !== null).length;
+    const logsWithClicks = logs.filter(log => log.clickedType !== null);
+    const clickThroughRate = successfulMatches > 0 
+      ? (logsWithClicks.length / successfulMatches) * 100 
+      : 0;
+
+    const logsWithScores = logs.filter(log => log.matchScore !== null);
+    const averageMatchScore = logsWithScores.length > 0
+      ? logsWithScores.reduce((sum, log) => sum + (log.matchScore || 0), 0) / logsWithScores.length
+      : null;
+
+    const cardStatsMap = new Map<string, { matchCount: number; clickCount: number }>();
+    logs.forEach(log => {
+      if (log.cardId) {
+        const stats = cardStatsMap.get(log.cardId) || { matchCount: 0, clickCount: 0 };
+        stats.matchCount++;
+        if (log.clickedType) stats.clickCount++;
+        cardStatsMap.set(log.cardId, stats);
+      }
+    });
+
+    const topCards = Array.from(cardStatsMap.entries())
+      .map(([cardId, stats]) => ({
+        cardId,
+        matchCount: stats.matchCount,
+        clickCount: stats.clickCount,
+        ctr: stats.matchCount > 0 ? (stats.clickCount / stats.matchCount) * 100 : 0
+      }))
+      .sort((a, b) => b.matchCount - a.matchCount)
+      .slice(0, 10);
+
+    const categoryStatsMap = new Map<string, { matchCount: number; clickCount: number }>();
+    logs.forEach(log => {
+      if (log.cardId) {
+        const card = cards.find(c => c.id === log.cardId);
+        if (card) {
+          const stats = categoryStatsMap.get(card.category) || { matchCount: 0, clickCount: 0 };
+          stats.matchCount++;
+          if (log.clickedType) stats.clickCount++;
+          categoryStatsMap.set(card.category, stats);
+        }
+      }
+    });
+
+    const categoryStats = Array.from(categoryStatsMap.entries())
+      .map(([category, stats]) => ({
+        category,
+        matchCount: stats.matchCount,
+        clickCount: stats.clickCount,
+        ctr: stats.matchCount > 0 ? (stats.clickCount / stats.matchCount) * 100 : 0
+      }))
+      .sort((a, b) => b.matchCount - a.matchCount);
+
+    const intentCountMap = new Map<string, number>();
+    logs.forEach(log => {
+      const intent = log.intentText.toLowerCase().trim();
+      intentCountMap.set(intent, (intentCountMap.get(intent) || 0) + 1);
+    });
+
+    const topIntents = Array.from(intentCountMap.entries())
+      .map(([intent, count]) => ({ intent, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const dateCountMap = new Map<string, number>();
+    logs.forEach(log => {
+      const date = log.timestamp.toISOString().split('T')[0];
+      dateCountMap.set(date, (dateCountMap.get(date) || 0) + 1);
+    });
+
+    const matchesByDate = Array.from(dateCountMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      totalMatches,
+      successfulMatches,
+      clickThroughRate,
+      averageMatchScore,
+      topCards,
+      categoryStats,
+      topIntents,
+      matchesByDate
+    };
   }
 
   async reloadHelpCardsFromJSON(): Promise<number> {
