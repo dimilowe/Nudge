@@ -365,11 +365,6 @@ export function createToastOverlay(options: ToastOptions): HTMLElement {
     </div>
   `;
 
-  // Debug badge in development
-  if (process.env.NODE_ENV === 'development') {
-    html = `<div class="debug-badge">DEBUG</div>` + html;
-  }
-
   toast.innerHTML = html;
 
   // Add event listeners
