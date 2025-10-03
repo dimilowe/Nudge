@@ -139,9 +139,31 @@ Preferred communication style: Simple, everyday language.
 **Design Decision**: Radix UI + shadcn provides accessible, customizable components without heavy framework lock-in. TanStack Query handles API caching efficiently for the demo app.
 
 ## Recent Changes (Oct 3, 2025)
-**Database Migration Complete**:
+**Phase 1 - Database Migration** (Completed):
 - Migrated from MemStorage to DbStorage using PostgreSQL
 - All help cards and match logs now persist across server restarts
 - Database automatically initializes with 6 seeded help cards from JSON
 - Storage interface unchanged - all existing API endpoints work identically
 - Match logs now permanently tracked for analytics dashboard
+
+**Phase 2 - Analytics Dashboard** (Completed):
+- Created `/analytics` page showing KPIs, top cards, category performance, user intents, timeline
+- Calculates real metrics from database: total matches, successful matches, CTR, avg match score
+- Charts use Recharts library for visualizations
+- All analytics calculated from actual match_logs data
+
+**Phase 3 - Admin Panel** (Completed):
+- Created `/admin` page for managing help cards
+- Full CRUD operations: create, edit, delete help cards
+- Test matching dialog for live testing without extension
+- Toast notifications for user feedback
+- All operations persist to PostgreSQL via Drizzle ORM
+
+**Phase 4 - A/B Testing Framework** (Completed):
+- Added `variant` column to match_logs table
+- Match API randomly assigns variants: control, compact, detailed
+- Match API returns `logId` for precise feedback tracking
+- Feedback API validates both logId and cardId (prevents spoofing/corruption)
+- Variant analytics endpoint (`/api/analytics/variants`) calculates per-variant metrics
+- Analytics dashboard shows variant comparison: impressions, CTR, feedback rate
+- All data integrity bugs fixed (no duplicates, correct log updates, validation)
