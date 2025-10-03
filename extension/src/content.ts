@@ -181,6 +181,11 @@ class IntentCapture {
         return;
       }
       
+      if (!cardId) {
+        console.error('No cardId available for feedback');
+        return;
+      }
+      
       await fetch(`${this.API_BASE_URL}/feedback`, {
         method: 'POST',
         headers: {

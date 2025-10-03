@@ -507,12 +507,16 @@ export function createPersistentPanel(): {
   panel.addEventListener('click', (e) => {
     e.stopPropagation();
     const target = e.target as HTMLElement;
-    const action = target.getAttribute('data-action');
+    
+    // Find the element with data-action, even if nested inside (e.g., span in button)
+    const actionElement = target.closest('[data-action]') as HTMLElement;
+    const action = actionElement?.getAttribute('data-action');
 
     switch (action) {
       case 'toggle-collapse':
         state.isCollapsed = !state.isCollapsed;
         panelWrapper.classList.toggle('collapsed', state.isCollapsed);
+        panelWrapper.classList.toggle('expanded', !state.isCollapsed);
         break;
         
       case 'close':
@@ -605,6 +609,7 @@ export function createPersistentPanel(): {
     // Auto-expand panel
     state.isCollapsed = false;
     panelWrapper.classList.remove('collapsed');
+    panelWrapper.classList.add('expanded');
   }
 
   function hideSuggestions() {
@@ -620,6 +625,7 @@ export function createPersistentPanel(): {
     // Auto-collapse panel
     state.isCollapsed = true;
     panelWrapper.classList.add('collapsed');
+    panelWrapper.classList.remove('expanded');
   }
 
   return { container, showSuggestions, hideSuggestions };
