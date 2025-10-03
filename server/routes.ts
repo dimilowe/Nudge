@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { matchRequestSchema, feedbackRequestSchema } from "@shared/schema";
 import { findBestMatch, extractLastWords } from "./services/match";
+import * as fs from "fs";
+import * as path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -298,6 +300,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Failed to update campaign" 
       });
     }
+  });
+
+  // GET /download-extension - Download Chrome extension archive
+  app.get("/download-extension", (req, res) => {
+    const filePath = path.join(process.cwd(), "intent-assistant-extension.tar.gz");
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Extension file not found" });
+    }
+    
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', 'attachment; filename="intent-assistant-extension.tar.gz"');
+    
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
   });
 
   const httpServer = createServer(app);
