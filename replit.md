@@ -35,7 +35,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Express Server
 - **RESTful API** (`server/routes.ts`) - Handles match requests and feedback logging
-- **In-Memory Storage** (`server/storage.ts`) - Maintains help cards and match logs in memory for MVP simplicity
+- **PostgreSQL Storage** (`server/storage.ts`) - Persists help cards and match logs using Drizzle ORM with Neon serverless PostgreSQL
+- **Database Layer** (`server/db.ts`) - Drizzle ORM connection configured with DATABASE_URL environment variable
 - **JSON Seed Data** (`server/seed/help-cards.json`) - Pre-populated help cards for 6 demo intents (shopping, food, jobs, SaaS, travel, creator)
 
 ### Matching Engine (`server/services/match.ts`)
@@ -43,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 - **Fuzzy Matching** - Implements Jaro-Winkler algorithm for similarity scoring (threshold ≥ 0.6)
 - **Best Match Selection** - Returns highest-scoring card, prioritizing sponsored content when available
 
-**Design Decision**: In-memory storage was chosen for MVP speed and simplicity. The storage interface (`IStorage`) is designed to be easily swapped for a database implementation (Drizzle ORM schema is already defined for PostgreSQL migration).
+**Design Decision**: Migrated from in-memory to PostgreSQL database (Oct 3, 2025) to enable analytics, admin panel, and persistent data. The storage interface (`IStorage`) allows seamless swapping between implementations. Database automatically seeds 6 help cards from JSON on first startup.
 
 ## Data Models
 
@@ -106,10 +107,12 @@ Preferred communication style: Simple, everyday language.
 
 # External Dependencies
 
-## Database (Future)
-- **PostgreSQL** - Configured via Drizzle ORM but currently using in-memory storage
-- **Neon Serverless** - PostgreSQL driver for serverless environments
-- **Connection String** - Expects `DATABASE_URL` environment variable
+## Database
+- **PostgreSQL** - Production database using Drizzle ORM for type-safe queries
+- **Neon Serverless** - PostgreSQL driver for serverless environments (@neondatabase/serverless)
+- **Connection String** - Uses `DATABASE_URL` environment variable
+- **Auto-initialization** - Database seeds from JSON file on first startup if empty
+- **Schema Management** - Run `npm run db:push` to sync schema changes (never write manual migrations)
 
 ## Third-Party Services
 - **Chrome Extension API** - For content scripts, storage, and context menus
@@ -135,9 +138,10 @@ Preferred communication style: Simple, everyday language.
 
 **Design Decision**: Radix UI + shadcn provides accessible, customizable components without heavy framework lock-in. TanStack Query handles API caching efficiently for the demo app.
 
-## Future Database Integration
-The codebase is prepared for PostgreSQL integration:
-- Drizzle schema defined in `shared/schema.ts`
-- Migration directory configured in `drizzle.config.ts`
-- Storage interface allows seamless swap from in-memory to database
-- Run `npm run db:push` to sync schema when database is provisioned
+## Recent Changes (Oct 3, 2025)
+**Database Migration Complete**:
+- Migrated from MemStorage to DbStorage using PostgreSQL
+- All help cards and match logs now persist across server restarts
+- Database automatically initializes with 6 seeded help cards from JSON
+- Storage interface unchanged - all existing API endpoints work identically
+- Match logs now permanently tracked for analytics dashboard
