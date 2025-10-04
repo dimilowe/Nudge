@@ -13,8 +13,9 @@ if (chromeAPI?.runtime) {
     if (message.action === 'setupContextMenu') {
       setupContextMenus();
       sendResponse({ success: true });
+      return true; // Only return true when we actually send a response
     }
-    return true;
+    // Don't return true for unhandled messages
   });
 }
 
