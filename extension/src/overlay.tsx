@@ -61,9 +61,13 @@ export function createPersistentPanel(): {
     z-index: 2147483647;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     pointer-events: none;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
   `;
 
-  const shadowRoot = container.attachShadow({ mode: 'closed' });
+  const shadowRoot = container.attachShadow({ mode: 'open' });
   
   // Create styles with glass-morphism
   const style = document.createElement('style');
