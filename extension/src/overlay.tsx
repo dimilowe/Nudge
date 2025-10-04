@@ -23,20 +23,31 @@ export function createPersistentPanel(): {
   showSuggestions: (options: PanelOptions) => void;
   hideSuggestions: () => void;
 } {
-  // State management
+  // State management with safe default position
   const state: PanelState = {
     isCollapsed: true,
-    position: { x: window.innerWidth - 324, y: window.innerHeight - 424 }, // Default bottom-right
+    position: { x: 50, y: 50 }, // Safe default position (50px from top-left)
     isDragging: false,
     dragOffset: { x: 0, y: 0 },
     currentSuggestions: null,
   };
 
-  // Load saved position from storage
+  // Helper to validate and constrain position within viewport
+  function constrainPosition(pos: { x: number; y: number }, width: number, height: number): { x: number; y: number } {
+    const maxX = Math.max(0, window.innerWidth - width);
+    const maxY = Math.max(0, window.innerHeight - height);
+    return {
+      x: Math.max(0, Math.min(pos.x, maxX)),
+      y: Math.max(0, Math.min(pos.y, maxY))
+    };
+  }
+
+  // Load saved position from storage with validation
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     chrome.storage.local.get(['panelPosition'], (result) => {
       if (result.panelPosition) {
-        state.position = result.panelPosition;
+        // Validate with collapsed size (panel starts collapsed)
+        state.position = constrainPosition(result.panelPosition, 48, 48);
         updatePanelPosition();
       }
     });
@@ -479,14 +490,15 @@ export function createPersistentPanel(): {
   document.addEventListener('mousemove', (e) => {
     if (!state.isDragging) return;
     
-    state.position = {
+    const newPosition = {
       x: e.clientX - state.dragOffset.x,
       y: e.clientY - state.dragOffset.y,
     };
     
-    // Constrain to viewport
-    state.position.x = Math.max(0, Math.min(state.position.x, window.innerWidth - (state.isCollapsed ? 48 : 300)));
-    state.position.y = Math.max(0, Math.min(state.position.y, window.innerHeight - (state.isCollapsed ? 48 : 400)));
+    // Constrain to viewport with current panel dimensions
+    const width = state.isCollapsed ? 48 : 300;
+    const height = state.isCollapsed ? 48 : 400;
+    state.position = constrainPosition(newPosition, width, height);
     
     updatePanelPosition();
   });
@@ -500,6 +512,19 @@ export function createPersistentPanel(): {
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {
         chrome.storage.local.set({ panelPosition: state.position });
       }
+    }
+  });
+
+  // Handle window resize to keep panel in bounds
+  window.addEventListener('resize', () => {
+    const width = state.isCollapsed ? 48 : 300;
+    const height = state.isCollapsed ? 48 : 400;
+    state.position = constrainPosition(state.position, width, height);
+    updatePanelPosition();
+    
+    // Save adjusted position
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ panelPosition: state.position });
     }
   });
 
@@ -517,6 +542,12 @@ export function createPersistentPanel(): {
         state.isCollapsed = !state.isCollapsed;
         panelWrapper.classList.toggle('collapsed', state.isCollapsed);
         panelWrapper.classList.toggle('expanded', !state.isCollapsed);
+        
+        // Re-validate position when expanding (to prevent panel going off-screen)
+        const width = state.isCollapsed ? 48 : 300;
+        const height = state.isCollapsed ? 48 : 400;
+        state.position = constrainPosition(state.position, width, height);
+        updatePanelPosition();
         break;
         
       case 'close':
@@ -610,6 +641,10 @@ export function createPersistentPanel(): {
     state.isCollapsed = false;
     panelWrapper.classList.remove('collapsed');
     panelWrapper.classList.add('expanded');
+    
+    // Validate position with expanded dimensions to prevent overflow
+    state.position = constrainPosition(state.position, 300, 400);
+    updatePanelPosition();
   }
 
   function hideSuggestions() {
@@ -626,6 +661,10 @@ export function createPersistentPanel(): {
     state.isCollapsed = true;
     panelWrapper.classList.add('collapsed');
     panelWrapper.classList.remove('expanded');
+    
+    // Validate position with collapsed dimensions for consistency
+    state.position = constrainPosition(state.position, 48, 48);
+    updatePanelPosition();
   }
 
   return { container, showSuggestions, hideSuggestions };
