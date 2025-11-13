@@ -434,52 +434,56 @@ export default function PageBuilderPage() {
                       </div>
                     </Card>
 
-                    {/* Live Preview */}
-                    <Card className="p-5 bg-gradient-to-br from-purple-600 to-blue-600 text-white relative overflow-hidden">
-                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
-                      <div className="relative z-10">
-                        <div className="text-xs font-semibold mb-3 opacity-75">LIVE PREVIEW</div>
-                        <h2 className="text-3xl font-bold mb-3">{contentHeadline}</h2>
-                        <p className="text-lg opacity-90 mb-6">{contentSubheadline}</p>
-                        <button className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg hover:shadow-xl transition-shadow">
-                          {contentCtaText}
-                        </button>
+                    {/* Live Preview - Link-in-bio Style */}
+                    <Card className="p-0 bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900 text-white relative overflow-hidden border-slate-700">
+                      <div className="relative z-10 p-8 flex flex-col items-center text-center min-h-[500px]">
+                        <div className="text-xs font-semibold mb-6 opacity-50 uppercase tracking-wider">LIVE PREVIEW</div>
                         
-                        {/* Show Offers */}
-                        {offers.length > 0 && (
-                          <div className="mt-8 pt-6 border-t border-white/20">
-                            <div className="text-xs font-semibold mb-3 opacity-75">YOUR OFFERS</div>
-                            <div className="space-y-3">
-                              {offers
-                                .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
-                                .filter((offer: any) => offer.isActive)
-                                .map((offer: any) => (
-                                  <div 
-                                    key={offer.id}
-                                    className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/20"
-                                  >
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <div className="font-bold text-sm">{offer.title}</div>
-                                        {offer.description && (
-                                          <div className="text-xs opacity-75 mt-1">{offer.description}</div>
-                                        )}
-                                      </div>
-                                      <Badge className="bg-white/20 text-white text-xs">
-                                        {offer.type.replace('_', ' ')}
-                                      </Badge>
+                        {/* Hero Section */}
+                        <div className="mb-8 w-full max-w-md">
+                          <h1 className="text-5xl font-black mb-3 tracking-tight">{contentHeadline}</h1>
+                          <p className="text-lg opacity-70 font-light">{contentSubheadline}</p>
+                        </div>
+                        
+                        {/* Offers Section */}
+                        {offers.length > 0 ? (
+                          <div className="w-full max-w-md space-y-3">
+                            <div className="flex items-center gap-2 mb-4">
+                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+                              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 px-3">
+                                Links
+                              </span>
+                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+                            </div>
+                            {offers
+                              .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                              .filter((offer: any) => offer.isActive)
+                              .map((offer: any) => (
+                                <div 
+                                  key={offer.id}
+                                  className="bg-white/5 hover:bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 text-left">
+                                      <div className="font-bold text-base group-hover:text-purple-300 transition-colors">{offer.title}</div>
+                                      {offer.description && (
+                                        <div className="text-sm opacity-60 mt-1">{offer.description}</div>
+                                      )}
+                                    </div>
+                                    <div className="ml-3 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                                      →
                                     </div>
                                   </div>
-                                ))}
-                            </div>
+                                </div>
+                              ))}
                           </div>
-                        )}
-                        
-                        {offers.length === 0 && (
-                          <div className="mt-8 pt-6 border-t border-white/20">
-                            <p className="text-sm opacity-60 text-center">
-                              No offers yet. Add offers in the Offers tab to see them here.
-                            </p>
+                        ) : (
+                          <div className="w-full max-w-md">
+                            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-dashed border-white/20">
+                              <p className="text-sm opacity-60">
+                                No links yet. Add offers in the Offers tab to see them here.
+                              </p>
+                            </div>
                           </div>
                         )}
                       </div>

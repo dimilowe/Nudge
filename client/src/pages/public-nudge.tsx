@@ -108,6 +108,18 @@ export default function PublicNudgePage() {
   });
 
   const page = pageData?.page;
+  
+  // Fetch all offers for this page
+  const { data: offersData } = useQuery({
+    queryKey: ['/api/offers', page?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/offers?pageId=${page.id}`);
+      return res.json();
+    },
+    enabled: !!page?.id,
+  });
+  
+  const offers = offersData?.offers || [];
 
   // Create session mutation
   const createSessionMutation = useMutation({
@@ -219,75 +231,82 @@ export default function PublicNudgePage() {
 
   if (!page) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <Card className="p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900">
+        <Card className="p-8 text-center bg-white/5 border-white/10 text-white">
           <h2 className="text-2xl font-bold mb-2">Page Not Found</h2>
-          <p className="text-muted-foreground">The page you're looking for doesn't exist.</p>
+          <p className="opacity-70">The page you're looking for doesn't exist.</p>
         </Card>
       </div>
     );
   }
 
+  // Get content from page
+  const content = page.content as any;
+  const heroSection = content?.sections?.[0];
+  const headline = heroSection?.headline || page.title;
+  const subheadline = heroSection?.subheadline || page.description || '';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" data-testid="page-public-nudge">
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900 text-white" data-testid="page-public-nudge">
+      <div className="container mx-auto px-4 py-12 max-w-2xl">
+        {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold mb-4" data-testid="text-page-title">
-            {page.title}
+          <h1 className="text-6xl font-black mb-4 tracking-tight" data-testid="text-page-title">
+            {headline}
           </h1>
-          {page.description && (
-            <p className="text-xl text-muted-foreground" data-testid="text-page-description">
-              {page.description}
+          {subheadline && (
+            <p className="text-xl opacity-70 font-light" data-testid="text-page-description">
+              {subheadline}
             </p>
           )}
         </div>
 
-        {/* Primary Offer */}
-        {offer && (
-          <Card className="p-8 mb-8 bg-white shadow-lg" data-testid="card-primary-offer">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="default">Featured Offer</Badge>
-              <Badge variant="outline">{offer.type}</Badge>
+        {/* Offers Section */}
+        {offers.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 px-3">
+                Links
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
             </div>
-            <h2 className="text-3xl font-bold mb-3" data-testid="text-offer-title">
-              {offer.title}
-            </h2>
-            {offer.description && (
-              <p className="text-lg text-muted-foreground mb-6" data-testid="text-offer-description">
-                {offer.description}
-              </p>
-            )}
-            {offer.imageUrl && (
-              <img 
-                src={offer.imageUrl} 
-                alt={offer.title}
-                className="w-full h-64 object-cover rounded-lg mb-6"
-              />
-            )}
-            <Button 
-              size="lg" 
-              className="w-full text-lg py-6"
-              onClick={() => handleOfferClick(offer)}
-              data-testid="button-primary-cta"
-            >
-              {offer.cta} →
-            </Button>
-          </Card>
+            
+            {offers
+              .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+              .filter((offer: any) => offer.isActive)
+              .map((offer: any) => (
+                <button
+                  key={offer.id}
+                  onClick={() => handleOfferClick(offer)}
+                  className="w-full bg-white/5 hover:bg-white/10 backdrop-blur-sm p-5 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all group"
+                  data-testid={`button-offer-${offer.id}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 text-left">
+                      <div className="font-bold text-lg group-hover:text-purple-300 transition-colors">
+                        {offer.title}
+                      </div>
+                      {offer.description && (
+                        <div className="text-sm opacity-60 mt-1">{offer.description}</div>
+                      )}
+                    </div>
+                    <div className="ml-4 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                      →
+                    </div>
+                  </div>
+                </button>
+              ))}
+          </div>
         )}
-
-        {/* About Section */}
-        <Card className="p-8 mb-8 bg-white">
-          <h3 className="text-2xl font-semibold mb-4">Why This Works</h3>
-          <p className="text-muted-foreground mb-4">
-            This page is powered by Nudge - the conversion brain that shows you the right offer at the right time.
-          </p>
-          <ul className="space-y-2 text-muted-foreground">
-            <li>✓ Personalized based on where you came from</li>
-            <li>✓ Optimized for your device</li>
-            <li>✓ Smart timing based on your engagement</li>
-          </ul>
-        </Card>
+        
+        {offers.length === 0 && (
+          <div className="text-center py-12">
+            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-dashed border-white/20">
+              <p className="opacity-60">No links available yet.</p>
+            </div>
+          </div>
+        )}
 
         {/* Scroll Tracking Debug Info (dev only) */}
         {process.env.NODE_ENV === 'development' && (
