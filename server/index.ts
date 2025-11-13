@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { seedNudgeData } from "./seed/nudge-seed";
 
 const app = express();
 
@@ -47,6 +48,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Seed demo data
+  try {
+    await seedNudgeData();
+  } catch (error) {
+    console.error('Warning: Failed to seed data:', error);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -1,10 +1,119 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { matchRequestSchema, feedbackRequestSchema } from "@shared/schema";
-import { findBestMatch, extractLastWords } from "./services/match";
-import * as fs from "fs";
-import * as path from "path";
+import { db } from "./db";
+import { creators } from "@shared/schema";
+import {
+  sessionStartSchema,
+  eventTrackSchema,
+  routeRequestSchema,
+  nudgePageFormSchema,
+  offerFormSchema,
+  automationFormSchema,
+  type RoutingConditions,
+} from "@shared/schema";
+
+// Helper function to detect traffic source from referrer
+function detectTrafficSource(referrer: string | undefined): string {
+  if (!referrer) return 'direct';
+  const url = referrer.toLowerCase();
+  if (url.includes('tiktok.com')) return 'tiktok';
+  if (url.includes('instagram.com')) return 'instagram';
+  if (url.includes('youtube.com')) return 'youtube';
+  if (url.includes('pinterest.com')) return 'pinterest';
+  if (url.includes('facebook.com')) return 'facebook';
+  if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
+  if (url.includes('t.co')) return 'email';
+  return 'other';
+}
+
+// Helper function to calculate intent level based on behavior
+function calculateIntentLevel(
+  trafficSource: string,
+  timeOnPage: number,
+  scrollDepth: number
+): string {
+  let score = 0;
+  
+  // Traffic source contributes
+  if (trafficSource === 'youtube') score += 3;
+  else if (trafficSource === 'email') score += 3;
+  else if (trafficSource === 'pinterest') score += 2;
+  else if (trafficSource === 'instagram') score += 1;
+  else if (trafficSource === 'tiktok') score += 1;
+  
+  // Time on page contributes
+  if (timeOnPage > 60) score += 3;
+  else if (timeOnPage > 30) score += 2;
+  else if (timeOnPage > 10) score += 1;
+  
+  // Scroll depth contributes
+  if (scrollDepth > 75) score += 2;
+  else if (scrollDepth > 50) score += 1;
+  
+  if (score >= 7) return 'buyer';
+  if (score >= 5) return 'high';
+  if (score >= 3) return 'medium';
+  return 'low';
+}
+
+// Smart routing: evaluate rules and return best offer
+async function evaluateRoutingRules(pageId: string, session: any): Promise<string | null> {
+  const rules = await storage.getRoutingRulesByPageId(pageId);
+  
+  // Filter only active rules
+  const activeRules = rules.filter(r => r.isActive);
+  
+  // Sort by priority (highest first)
+  activeRules.sort((a, b) => b.priority - a.priority);
+  
+  for (const rule of activeRules) {
+    const conditions = rule.conditions as RoutingConditions;
+    let matches = true;
+    
+    // Check traffic source
+    if (conditions.trafficSource && conditions.trafficSource.length > 0) {
+      if (!conditions.trafficSource.includes(session.trafficSource)) {
+        matches = false;
+      }
+    }
+    
+    // Check device
+    if (conditions.device && conditions.device.length > 0) {
+      if (!conditions.device.includes(session.device)) {
+        matches = false;
+      }
+    }
+    
+    // Check intent level
+    if (conditions.intentLevel && conditions.intentLevel.length > 0) {
+      if (!conditions.intentLevel.includes(session.intentLevel)) {
+        matches = false;
+      }
+    }
+    
+    // Check returning visitor
+    if (conditions.returning !== undefined) {
+      if (conditions.returning !== session.isReturning) {
+        matches = false;
+      }
+    }
+    
+    if (matches) {
+      return rule.offerId;
+    }
+  }
+  
+  // If no rules matched, try fallback
+  const fallback = activeRules.find(r => r.isFallback);
+  if (fallback) {
+    return fallback.offerId;
+  }
+  
+  // If no fallback, use page's default offer
+  const page = await storage.getNudgePage(pageId);
+  return page?.defaultOfferId || null;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -13,21 +122,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const origin = req.get("origin");
     const path = req.path;
     
-    // Extension endpoints - allow all origins (privacy-safe, read-only user data)
-    const extensionEndpoints = ['/api/match', '/api/feedback'];
-    const isExtensionEndpoint = extensionEndpoints.some(endpoint => path.startsWith(endpoint));
+    // Public endpoints - allow all origins (for public Nudge pages)
+    const publicEndpoints = ['/api/track/session', '/api/track/event', '/api/route', '/api/pages/'];
+    const isPublicEndpoint = publicEndpoints.some(endpoint => path.startsWith(endpoint));
     
     if (origin) {
-      if (isExtensionEndpoint) {
-        // Allow all origins for extension functionality
+      if (isPublicEndpoint) {
+        // Allow all origins for public tracking and routing
         res.header("Access-Control-Allow-Origin", origin);
       } else {
         // Admin endpoints - only allow Replit domain and localhost
         const allowedAdminOrigins = [
-          'https://ea5b6803-344d-47e5-8427-a61029737083-00-27nkosr42ci4h.janeway.replit.dev',
+          process.env.REPLIT_DEV_DOMAIN || '',
           'http://localhost:5000',
           'http://localhost:5173'
-        ];
+        ].filter(Boolean);
         
         if (allowedAdminOrigins.includes(origin)) {
           res.header("Access-Control-Allow-Origin", origin);
@@ -45,297 +154,431 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // POST /api/match - Match user intent to help cards
-  app.post("/api/match", async (req, res) => {
+  // ===== DEMO DATA =====
+  
+  // GET /api/demo - Get demo creator and first page for development
+  app.get("/api/demo", async (req, res) => {
     try {
-      const validatedRequest = matchRequestSchema.parse(req.body);
-      
-      // Extract last 6 words from user input
-      const intentPhrase = extractLastWords(validatedRequest.text, 6);
-      
-      if (!intentPhrase.trim()) {
-        return res.json({ matched: false, message: "No intent detected" });
+      // Get first creator (demo creator)
+      const creator = await db.select().from(creators).limit(1);
+      if (creator.length === 0) {
+        return res.status(404).json({ error: "No creators found" });
       }
       
-      // Get all help cards
-      const cards = await storage.getAllHelpCards();
-      
-      // Find best match
-      const matchResult = findBestMatch(intentPhrase, cards);
-      
-      // Log the match attempt and get the log ID
-      const matchLog = await storage.createMatchLog({
-        intentText: intentPhrase,
-        urlOrigin: new URL(validatedRequest.url).origin,
-        cardId: matchResult.cardId || null,
-        matchScore: matchResult.score ? Math.round(matchResult.score * 100) : null,
-        wasHelpful: null,
-        clickedType: null,
-        variant: matchResult.variant || null,
-      });
-      
-      // Include logId in response so client can send it back with feedback
-      return res.json({ ...matchResult, logId: matchLog.id });
-      
-    } catch (error) {
-      console.error("Match error:", error);
-      return res.status(400).json({ 
-        matched: false, 
-        error: "Invalid request format" 
-      });
-    }
-  });
-
-  // POST /api/feedback - Record user feedback
-  app.post("/api/feedback", async (req, res) => {
-    try {
-      const feedback = feedbackRequestSchema.parse(req.body);
-      
-      // First, fetch the match log to verify cardId matches
-      const logs = await storage.getMatchLogs(1000);
-      const matchLog = logs.find(log => log.id === feedback.logId);
-      
-      if (!matchLog) {
-        return res.status(404).json({ 
-          success: false, 
-          error: "Match log not found" 
-        });
-      }
-      
-      // Verify cardId matches to prevent spoofing
-      if (matchLog.cardId !== feedback.cardId) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Card ID mismatch" 
-        });
-      }
-      
-      // Update only the feedback-specific fields
-      const updatedLog = await storage.updateMatchLog(feedback.logId, {
-        wasHelpful: feedback.wasHelpful,
-        clickedType: feedback.clicked || null,
-      });
-      
-      if (!updatedLog) {
-        return res.status(500).json({ 
-          success: false, 
-          error: "Failed to update match log" 
-        });
-      }
-      
-      return res.json({ 
-        success: true, 
-        message: "Feedback recorded" 
-      });
-      
-    } catch (error) {
-      console.error("Feedback error:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: "Invalid feedback format" 
-      });
-    }
-  });
-
-  // POST /api/reload - Hot-reload help cards from JSON (dev only)
-  app.post("/api/reload", async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
-      return res.status(403).json({ 
-        success: false, 
-        error: "Reload not available in production" 
-      });
-    }
-    
-    try {
-      const cardsLoaded = await storage.reloadHelpCardsFromJSON();
+      // Get first page for this creator
+      const pages = await storage.getNudgePagesByCreatorId(creator[0].id);
+      const page = pages[0] || null;
       
       return res.json({
-        success: true,
-        cardsLoaded,
-        message: "Help cards reloaded successfully"
+        creator: creator[0],
+        page,
+      });
+    } catch (error) {
+      console.error("Demo data fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch demo data" });
+    }
+  });
+
+  // ===== NUDGE PAGES =====
+  
+  // GET /api/pages - List all pages for a creator
+  app.get("/api/pages", async (req, res) => {
+    try {
+      const creatorId = req.query.creatorId as string;
+      if (!creatorId) {
+        return res.status(400).json({ error: "creatorId required" });
+      }
+      
+      const pages = await storage.getNudgePagesByCreatorId(creatorId);
+      return res.json({ pages });
+    } catch (error) {
+      console.error("Pages fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch pages" });
+    }
+  });
+  
+  // GET /api/pages/:slug - Get page by slug
+  app.get("/api/pages/:slug", async (req, res) => {
+    try {
+      const page = await storage.getNudgePageBySlug(req.params.slug);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      return res.json({ page });
+    } catch (error) {
+      console.error("Page fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch page" });
+    }
+  });
+  
+  // POST /api/pages - Create a new page
+  app.post("/api/pages", async (req, res) => {
+    try {
+      const validated = nudgePageFormSchema.parse(req.body);
+      const page = await storage.createNudgePage(validated);
+      return res.json({ page });
+    } catch (error) {
+      console.error("Page creation error:", error);
+      return res.status(400).json({ error: "Failed to create page" });
+    }
+  });
+  
+  // PUT /api/pages/:id - Update a page
+  app.put("/api/pages/:id", async (req, res) => {
+    try {
+      const page = await storage.updateNudgePage(req.params.id, req.body);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      return res.json({ page });
+    } catch (error) {
+      console.error("Page update error:", error);
+      return res.status(400).json({ error: "Failed to update page" });
+    }
+  });
+  
+  // DELETE /api/pages/:id - Delete a page
+  app.delete("/api/pages/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteNudgePage(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Page deletion error:", error);
+      return res.status(500).json({ error: "Failed to delete page" });
+    }
+  });
+
+  // ===== OFFERS =====
+  
+  // GET /api/offers - Get offers for a page
+  app.get("/api/offers", async (req, res) => {
+    try {
+      const pageId = req.query.pageId as string;
+      if (!pageId) {
+        return res.status(400).json({ error: "pageId required" });
+      }
+      
+      const offers = await storage.getOffersByPageId(pageId);
+      return res.json({ offers });
+    } catch (error) {
+      console.error("Offers fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch offers" });
+    }
+  });
+  
+  // POST /api/offers - Create a new offer
+  app.post("/api/offers", async (req, res) => {
+    try {
+      const validated = offerFormSchema.parse(req.body);
+      const offer = await storage.createOffer({
+        ...validated,
+        displayOrder: validated.displayOrder || 0,
+        isActive: validated.isActive !== undefined ? validated.isActive : true,
+      });
+      return res.json({ offer });
+    } catch (error) {
+      console.error("Offer creation error:", error);
+      return res.status(400).json({ error: "Failed to create offer" });
+    }
+  });
+  
+  // PUT /api/offers/:id - Update an offer
+  app.put("/api/offers/:id", async (req, res) => {
+    try {
+      const offer = await storage.updateOffer(req.params.id, req.body);
+      if (!offer) {
+        return res.status(404).json({ error: "Offer not found" });
+      }
+      return res.json({ offer });
+    } catch (error) {
+      console.error("Offer update error:", error);
+      return res.status(400).json({ error: "Failed to update offer" });
+    }
+  });
+  
+  // DELETE /api/offers/:id - Delete an offer
+  app.delete("/api/offers/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteOffer(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Offer not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Offer deletion error:", error);
+      return res.status(500).json({ error: "Failed to delete offer" });
+    }
+  });
+
+  // ===== ROUTING RULES =====
+  
+  // GET /api/routing-rules - Get rules for a page
+  app.get("/api/routing-rules", async (req, res) => {
+    try {
+      const pageId = req.query.pageId as string;
+      if (!pageId) {
+        return res.status(400).json({ error: "pageId required" });
+      }
+      
+      const rules = await storage.getRoutingRulesByPageId(pageId);
+      return res.json({ rules });
+    } catch (error) {
+      console.error("Rules fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch rules" });
+    }
+  });
+  
+  // POST /api/routing-rules - Create a routing rule
+  app.post("/api/routing-rules", async (req, res) => {
+    try {
+      const rule = await storage.createRoutingRule(req.body);
+      return res.json({ rule });
+    } catch (error) {
+      console.error("Rule creation error:", error);
+      return res.status(400).json({ error: "Failed to create rule" });
+    }
+  });
+  
+  // PUT /api/routing-rules/:id - Update a routing rule
+  app.put("/api/routing-rules/:id", async (req, res) => {
+    try {
+      const rule = await storage.updateRoutingRule(req.params.id, req.body);
+      if (!rule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      return res.json({ rule });
+    } catch (error) {
+      console.error("Rule update error:", error);
+      return res.status(400).json({ error: "Failed to update rule" });
+    }
+  });
+  
+  // DELETE /api/routing-rules/:id - Delete a routing rule
+  app.delete("/api/routing-rules/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteRoutingRule(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Rule deletion error:", error);
+      return res.status(500).json({ error: "Failed to delete rule" });
+    }
+  });
+
+  // ===== AUTOMATIONS =====
+  
+  // GET /api/automations - Get automations for a page
+  app.get("/api/automations", async (req, res) => {
+    try {
+      const pageId = req.query.pageId as string;
+      if (!pageId) {
+        return res.status(400).json({ error: "pageId required" });
+      }
+      
+      const automations = await storage.getAutomationsByPageId(pageId);
+      return res.json({ automations });
+    } catch (error) {
+      console.error("Automations fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch automations" });
+    }
+  });
+  
+  // POST /api/automations - Create an automation
+  app.post("/api/automations", async (req, res) => {
+    try {
+      const validated = automationFormSchema.parse(req.body);
+      const automation = await storage.createAutomation({
+        ...validated,
+        isActive: validated.isActive !== undefined ? validated.isActive : true,
+      });
+      return res.json({ automation });
+    } catch (error) {
+      console.error("Automation creation error:", error);
+      return res.status(400).json({ error: "Failed to create automation" });
+    }
+  });
+  
+  // PUT /api/automations/:id - Update an automation
+  app.put("/api/automations/:id", async (req, res) => {
+    try {
+      const automation = await storage.updateAutomation(req.params.id, req.body);
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+      return res.json({ automation });
+    } catch (error) {
+      console.error("Automation update error:", error);
+      return res.status(400).json({ error: "Failed to update automation" });
+    }
+  });
+  
+  // DELETE /api/automations/:id - Delete an automation
+  app.delete("/api/automations/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteAutomation(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Automation deletion error:", error);
+      return res.status(500).json({ error: "Failed to delete automation" });
+    }
+  });
+
+  // ===== VISITOR TRACKING =====
+  
+  // POST /api/track/session - Start or update a visitor session
+  app.post("/api/track/session", async (req, res) => {
+    try {
+      const validated = sessionStartSchema.parse(req.body);
+      
+      // Get the page
+      const page = await storage.getNudgePageBySlug(validated.pageSlug);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      
+      // Detect traffic source
+      const trafficSource = validated.utmSource || detectTrafficSource(validated.referrer);
+      
+      // Create session
+      const session = await storage.createVisitorSession({
+        pageId: page.id,
+        fingerprint: validated.fingerprint || null,
+        trafficSource,
+        referrer: validated.referrer || null,
+        utmSource: validated.utmSource || null,
+        utmMedium: validated.utmMedium || null,
+        utmCampaign: validated.utmCampaign || null,
+        device: validated.device,
+        os: validated.os || null,
+        intentLevel: 'low', // will be updated as user behaves
+        isReturning: false, // TODO: check if fingerprint exists
       });
       
+      return res.json({ sessionId: session.id });
     } catch (error) {
-      console.error("Reload error:", error);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to reload help cards"
-      });
+      console.error("Session creation error:", error);
+      return res.status(400).json({ error: "Failed to create session" });
     }
   });
-
-  // GET /api/cards - List all help cards (for admin)
-  app.get("/api/cards", async (req, res) => {
+  
+  // POST /api/track/event - Track a visitor event
+  app.post("/api/track/event", async (req, res) => {
     try {
-      const cards = await storage.getAllHelpCards();
-      return res.json({ success: true, cards });
-    } catch (error) {
-      console.error("Cards list error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to fetch help cards" 
+      const validated = eventTrackSchema.parse(req.body);
+      
+      const event = await storage.createVisitorEvent({
+        sessionId: validated.sessionId,
+        eventType: validated.eventType,
+        meta: validated.meta || null,
       });
-    }
-  });
-
-  // GET /api/logs - Get recent match logs (for admin)
-  app.get("/api/logs", async (req, res) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 100;
-      const logs = await storage.getMatchLogs(limit);
-      return res.json({ success: true, logs });
-    } catch (error) {
-      console.error("Logs fetch error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to fetch logs" 
-      });
-    }
-  });
-
-  // GET /api/analytics - Get analytics data
-  app.get("/api/analytics", async (req, res) => {
-    try {
-      const analytics = await storage.getAnalytics();
-      return res.json({ success: true, data: analytics });
-    } catch (error) {
-      console.error("Analytics fetch error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to fetch analytics" 
-      });
-    }
-  });
-
-  // GET /api/analytics/variants - Get A/B test variant analytics
-  app.get("/api/analytics/variants", async (req, res) => {
-    try {
-      const variantAnalytics = await storage.getVariantAnalytics();
-      return res.json({ success: true, data: variantAnalytics });
-    } catch (error) {
-      console.error("Variant analytics fetch error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to fetch variant analytics" 
-      });
-    }
-  });
-
-  // POST /api/cards - Create a new help card
-  app.post("/api/cards", async (req, res) => {
-    try {
-      const card = await storage.createHelpCard(req.body);
-      return res.json({ success: true, card });
-    } catch (error) {
-      console.error("Card creation error:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: "Failed to create help card" 
-      });
-    }
-  });
-
-  // PUT /api/cards/:id - Update a help card
-  app.put("/api/cards/:id", async (req, res) => {
-    try {
-      const card = await storage.updateHelpCard(req.params.id, req.body);
-      if (!card) {
-        return res.status(404).json({ 
-          success: false, 
-          error: "Help card not found" 
+      
+      // Update session's last seen and intent level
+      const session = await storage.getVisitorSession(validated.sessionId);
+      if (session) {
+        const events = await storage.getEventsBySessionId(validated.sessionId);
+        
+        // Calculate time on page
+        const timeOnPage = (Date.now() - new Date(session.startedAt).getTime()) / 1000;
+        
+        // Get max scroll depth
+        const scrollEvents = events.filter(e => e.eventType === 'scroll' && e.meta);
+        const maxScrollDepth = scrollEvents.length > 0
+          ? Math.max(...scrollEvents.map(e => (e.meta as any)?.scrollDepth || 0))
+          : 0;
+        
+        // Recalculate intent level
+        const intentLevel = calculateIntentLevel(
+          session.trafficSource || 'unknown',
+          timeOnPage,
+          maxScrollDepth
+        );
+        
+        await storage.updateVisitorSession(validated.sessionId, {
+          lastSeenAt: new Date(),
+          intentLevel,
         });
       }
-      return res.json({ success: true, card });
+      
+      return res.json({ success: true, eventId: event.id });
     } catch (error) {
-      console.error("Card update error:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: "Failed to update help card" 
-      });
+      console.error("Event tracking error:", error);
+      return res.status(400).json({ error: "Failed to track event" });
     }
   });
 
-  // DELETE /api/cards/:id - Delete a help card
-  app.delete("/api/cards/:id", async (req, res) => {
+  // ===== SMART ROUTING ENGINE =====
+  
+  // POST /api/route - Get the best offer for this visitor
+  app.post("/api/route", async (req, res) => {
     try {
-      const success = await storage.deleteHelpCard(req.params.id);
-      if (!success) {
-        return res.status(404).json({ 
-          success: false, 
-          error: "Help card not found" 
-        });
+      const validated = routeRequestSchema.parse(req.body);
+      
+      // Get session
+      const session = await storage.getVisitorSession(validated.sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
       }
-      return res.json({ success: true, message: "Card deleted successfully" });
-    } catch (error) {
-      console.error("Card deletion error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to delete help card" 
-      });
-    }
-  });
-
-  // POST /api/campaigns - Create a new campaign
-  app.post("/api/campaigns", async (req, res) => {
-    try {
-      const campaign = await storage.createCampaign(req.body);
-      return res.json({ success: true, campaign });
-    } catch (error) {
-      console.error("Campaign creation error:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: "Failed to create campaign" 
-      });
-    }
-  });
-
-  // GET /api/campaigns/advertiser/:advertiserId - Get campaigns by advertiser
-  app.get("/api/campaigns/advertiser/:advertiserId", async (req, res) => {
-    try {
-      const campaigns = await storage.getCampaignsByAdvertiser(req.params.advertiserId);
-      return res.json({ success: true, campaigns });
-    } catch (error) {
-      console.error("Campaigns fetch error:", error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to fetch campaigns" 
-      });
-    }
-  });
-
-  // PUT /api/campaigns/:id - Update a campaign
-  app.put("/api/campaigns/:id", async (req, res) => {
-    try {
-      const campaign = await storage.updateCampaign(req.params.id, req.body);
-      if (!campaign) {
-        return res.status(404).json({ 
-          success: false, 
-          error: "Campaign not found" 
-        });
+      
+      // Get page
+      const page = await storage.getNudgePageBySlug(validated.pageSlug);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
       }
-      return res.json({ success: true, campaign });
-    } catch (error) {
-      console.error("Campaign update error:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: "Failed to update campaign" 
+      
+      // Evaluate routing rules
+      const offerId = await evaluateRoutingRules(page.id, session);
+      
+      // Always get automations, even if no offer is selected
+      const automations = await storage.getAutomationsByPageId(page.id);
+      const activeAutomations = automations.filter(a => a.isActive);
+      
+      if (!offerId) {
+        return res.json({ offer: null, automations: activeAutomations });
+      }
+      
+      // Get the offer
+      const offer = await storage.getOffer(offerId);
+      
+      return res.json({ 
+        offer, 
+        automations: activeAutomations 
       });
+    } catch (error) {
+      console.error("Routing error:", error);
+      return res.status(400).json({ error: "Failed to route offer" });
     }
   });
 
-  // GET /download-extension - Download Chrome extension archive
-  app.get("/download-extension", (req, res) => {
-    const filePath = path.join(process.cwd(), "intent-assistant-extension.tar.gz");
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Extension file not found" });
+  // ===== ANALYTICS =====
+  
+  // GET /api/analytics/page/:pageId - Get page analytics
+  app.get("/api/analytics/page/:pageId", async (req, res) => {
+    try {
+      const analytics = await storage.getPageAnalytics(req.params.pageId);
+      return res.json({ analytics });
+    } catch (error) {
+      console.error("Page analytics error:", error);
+      return res.status(500).json({ error: "Failed to fetch page analytics" });
     }
-    
-    res.setHeader('Content-Type', 'application/gzip');
-    res.setHeader('Content-Disposition', 'attachment; filename="intent-assistant-extension.tar.gz"');
-    
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
+  });
+  
+  // GET /api/analytics/offer/:offerId - Get offer analytics
+  app.get("/api/analytics/offer/:offerId", async (req, res) => {
+    try {
+      const analytics = await storage.getOfferAnalytics(req.params.offerId);
+      return res.json({ analytics });
+    } catch (error) {
+      console.error("Offer analytics error:", error);
+      return res.status(500).json({ error: "Failed to fetch offer analytics" });
+    }
   });
 
   const httpServer = createServer(app);
