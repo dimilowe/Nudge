@@ -34,6 +34,13 @@ export default function PageBuilderPage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [showNewPageForm, setShowNewPageForm] = useState(false);
   const [showNewOfferForm, setShowNewOfferForm] = useState(false);
+  
+  // Content editor state
+  const [contentHeadline, setContentHeadline] = useState('Your Amazing Headline');
+  const [contentSubheadline, setContentSubheadline] = useState('Supporting text that explains your offer');
+  const [contentCtaText, setContentCtaText] = useState('Get Started');
+  const [contentCtaHref, setContentCtaHref] = useState('');
+  const [contentBgStyle, setContentBgStyle] = useState('gradient');
 
   // Fetch demo data (creator + page)
   const { data: demoData } = useQuery({
@@ -112,6 +119,20 @@ export default function PageBuilderPage() {
       toast({ title: 'Offer deleted successfully!' });
     },
   });
+  
+  // Update page content mutation
+  const updateContentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('PATCH', `/api/pages/${selectedPageId}/content`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/pages', creator?.id] });
+      toast({ title: 'Content saved successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to save content', variant: 'destructive' });
+    },
+  });
 
   // New page form
   const pageForm = useForm<NudgePageFormData & { creatorId: string }>({
@@ -133,6 +154,29 @@ export default function PageBuilderPage() {
       });
     }
   }, [creator?.id, pageForm]);
+  
+  // Load content when page is selected
+  useEffect(() => {
+    if (selectedPage) {
+      const content = selectedPage.content as any;
+      const heroSection = content?.sections?.[0];
+      
+      if (heroSection && heroSection.type === 'hero') {
+        setContentHeadline(heroSection.headline || 'Your Amazing Headline');
+        setContentSubheadline(heroSection.subheadline || 'Supporting text that explains your offer');
+        setContentCtaText(heroSection.ctaText || 'Get Started');
+        setContentCtaHref(heroSection.ctaHref || '');
+        setContentBgStyle(heroSection.backgroundColor || 'gradient');
+      } else {
+        // Reset to defaults for new pages
+        setContentHeadline('Your Amazing Headline');
+        setContentSubheadline('Supporting text that explains your offer');
+        setContentCtaText('Get Started');
+        setContentCtaHref('');
+        setContentBgStyle('gradient');
+      }
+    }
+  }, [selectedPage]);
 
   // New offer form
   const offerForm = useForm<OfferFormData>({
@@ -159,6 +203,31 @@ export default function PageBuilderPage() {
 
   const onCreateOffer = (data: OfferFormData) => {
     createOfferMutation.mutate({ ...data, pageId: selectedPageId! });
+  };
+  
+  const handleSaveContent = () => {
+    if (!selectedPageId) {
+      toast({ title: 'No page selected', variant: 'destructive' });
+      return;
+    }
+    
+    const contentData = {
+      content: {
+        version: 1,
+        sections: [
+          {
+            type: 'hero' as const,
+            headline: contentHeadline,
+            subheadline: contentSubheadline,
+            ctaText: contentCtaText,
+            ctaHref: contentCtaHref,
+            backgroundColor: contentBgStyle,
+          }
+        ]
+      }
+    };
+    
+    updateContentMutation.mutate(contentData);
   };
 
   return (
@@ -304,6 +373,8 @@ export default function PageBuilderPage() {
                         <div>
                           <label className="text-sm font-medium">Headline</label>
                           <Input 
+                            value={contentHeadline}
+                            onChange={(e) => setContentHeadline(e.target.value)}
                             placeholder="Your Amazing Headline" 
                             className="mt-1.5"
                             data-testid="input-content-headline"
@@ -312,6 +383,8 @@ export default function PageBuilderPage() {
                         <div>
                           <label className="text-sm font-medium">Subheadline</label>
                           <Input 
+                            value={contentSubheadline}
+                            onChange={(e) => setContentSubheadline(e.target.value)}
                             placeholder="Supporting text that explains your offer" 
                             className="mt-1.5"
                             data-testid="input-content-subheadline"
@@ -320,6 +393,8 @@ export default function PageBuilderPage() {
                         <div>
                           <label className="text-sm font-medium">CTA Button Text</label>
                           <Input 
+                            value={contentCtaText}
+                            onChange={(e) => setContentCtaText(e.target.value)}
                             placeholder="Get Started" 
                             className="mt-1.5"
                             data-testid="input-content-cta-text"
@@ -328,6 +403,8 @@ export default function PageBuilderPage() {
                         <div>
                           <label className="text-sm font-medium">CTA Button Link</label>
                           <Input 
+                            value={contentCtaHref}
+                            onChange={(e) => setContentCtaHref(e.target.value)}
                             placeholder="https://..." 
                             className="mt-1.5"
                             data-testid="input-content-cta-href"
@@ -335,7 +412,7 @@ export default function PageBuilderPage() {
                         </div>
                         <div>
                           <label className="text-sm font-medium">Background Style</label>
-                          <Select defaultValue="gradient">
+                          <Select value={contentBgStyle} onValueChange={setContentBgStyle}>
                             <SelectTrigger className="mt-1.5" data-testid="select-background-style">
                               <SelectValue />
                             </SelectTrigger>
@@ -346,8 +423,13 @@ export default function PageBuilderPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button className="w-full gradient-primary text-white" data-testid="button-save-content">
-                          Save Content
+                        <Button 
+                          onClick={handleSaveContent}
+                          disabled={updateContentMutation.isPending}
+                          className="w-full gradient-primary text-white" 
+                          data-testid="button-save-content"
+                        >
+                          {updateContentMutation.isPending ? 'Saving...' : 'Save Content'}
                         </Button>
                       </div>
                     </Card>
@@ -357,11 +439,49 @@ export default function PageBuilderPage() {
                       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
                       <div className="relative z-10">
                         <div className="text-xs font-semibold mb-3 opacity-75">LIVE PREVIEW</div>
-                        <h2 className="text-3xl font-bold mb-3">Your Amazing Headline</h2>
-                        <p className="text-lg opacity-90 mb-6">Supporting text that explains your offer</p>
+                        <h2 className="text-3xl font-bold mb-3">{contentHeadline}</h2>
+                        <p className="text-lg opacity-90 mb-6">{contentSubheadline}</p>
                         <button className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg hover:shadow-xl transition-shadow">
-                          Get Started
+                          {contentCtaText}
                         </button>
+                        
+                        {/* Show Offers */}
+                        {offers.length > 0 && (
+                          <div className="mt-8 pt-6 border-t border-white/20">
+                            <div className="text-xs font-semibold mb-3 opacity-75">YOUR OFFERS</div>
+                            <div className="space-y-3">
+                              {offers
+                                .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                                .filter((offer: any) => offer.isActive)
+                                .map((offer: any) => (
+                                  <div 
+                                    key={offer.id}
+                                    className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/20"
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <div className="font-bold text-sm">{offer.title}</div>
+                                        {offer.description && (
+                                          <div className="text-xs opacity-75 mt-1">{offer.description}</div>
+                                        )}
+                                      </div>
+                                      <Badge className="bg-white/20 text-white text-xs">
+                                        {offer.type.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {offers.length === 0 && (
+                          <div className="mt-8 pt-6 border-t border-white/20">
+                            <p className="text-sm opacity-60 text-center">
+                              No offers yet. Add offers in the Offers tab to see them here.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </Card>
                   </div>
