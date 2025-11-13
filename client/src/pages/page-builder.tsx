@@ -75,7 +75,7 @@ export default function PageBuilderPage() {
   // Create page mutation
   const createPageMutation = useMutation({
     mutationFn: async (data: NudgePageFormData & { creatorId: string }) => {
-      return await apiRequest('/api/pages', 'POST', data);
+      return await apiRequest('POST', '/api/pages', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pages', creator?.id] });
@@ -90,7 +90,7 @@ export default function PageBuilderPage() {
   // Create offer mutation
   const createOfferMutation = useMutation({
     mutationFn: async (data: OfferFormData) => {
-      return await apiRequest('/api/offers', 'POST', data);
+      return await apiRequest('POST', '/api/offers', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
@@ -105,7 +105,7 @@ export default function PageBuilderPage() {
   // Delete offer mutation
   const deleteOfferMutation = useMutation({
     mutationFn: async (offerId: string) => {
-      return await apiRequest(`/api/offers/${offerId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/offers/${offerId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
