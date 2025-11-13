@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import useEmblaCarousel from 'embla-carousel-react';
 
 // Detect device type
 function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
@@ -85,6 +86,70 @@ function useTimeTracking(sessionId: string | null) {
   }, [sessionId]);
 
   return timeOnPage;
+}
+
+// Offers Carousel Component
+function OffersCarousel({ offers, onOfferClick }: { offers: any[]; onOfferClick: (offer: any) => void }) {
+  const [emblaRef] = useEmblaCarousel({ 
+    loop: false, 
+    align: 'start',
+    slidesToScroll: 1,
+    containScroll: 'trimSnaps',
+  });
+  
+  const sortedOffers = offers
+    .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+    .filter((offer: any) => offer.isActive);
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+        <span className="text-sm font-semibold px-3 opacity-90">
+          Swipe to explore →
+        </span>
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+      </div>
+      
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex gap-4">
+          {sortedOffers.map((offer: any) => (
+            <div
+              key={offer.id}
+              className="flex-[0_0_85%] md:flex-[0_0_45%] min-w-0"
+            >
+              <button
+                onClick={() => onOfferClick(offer)}
+                className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm p-6 rounded-3xl border border-white/20 hover:border-white/40 transition-all group shadow-xl hover:shadow-2xl"
+                data-testid={`button-offer-${offer.id}`}
+              >
+                <div className="text-left">
+                  <div className="font-bold text-xl group-hover:text-purple-200 transition-colors mb-2">
+                    {offer.title}
+                  </div>
+                  {offer.description && (
+                    <div className="text-sm opacity-75 mb-4 line-clamp-2">{offer.description}</div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-white/20 text-white border-white/30">
+                      {offer.type.replace('_', ' ')}
+                    </Badge>
+                    <div className="text-2xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                      →
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="text-center mt-6">
+        <p className="text-sm opacity-60">← Swipe to see more offers →</p>
+      </div>
+    </div>
+  );
 }
 
 export default function PublicNudgePage() {
@@ -270,44 +335,8 @@ export default function PublicNudgePage() {
           )}
         </div>
 
-        {/* Offers Section */}
-        {offers.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
-              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 px-3">
-                Links
-              </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
-            </div>
-            
-            {offers
-              .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
-              .filter((offer: any) => offer.isActive)
-              .map((offer: any) => (
-                <button
-                  key={offer.id}
-                  onClick={() => handleOfferClick(offer)}
-                  className="w-full bg-white/5 hover:bg-white/10 backdrop-blur-sm p-5 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all group"
-                  data-testid={`button-offer-${offer.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 text-left">
-                      <div className="font-bold text-lg group-hover:text-purple-300 transition-colors">
-                        {offer.title}
-                      </div>
-                      {offer.description && (
-                        <div className="text-sm opacity-60 mt-1">{offer.description}</div>
-                      )}
-                    </div>
-                    <div className="ml-4 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
-                      →
-                    </div>
-                  </div>
-                </button>
-              ))}
-          </div>
-        )}
+        {/* Offers Carousel */}
+        {offers.length > 0 && <OffersCarousel offers={offers} onOfferClick={handleOfferClick} />}
         
         {offers.length === 0 && (
           <div className="text-center py-12">

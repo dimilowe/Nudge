@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import type { NudgePageFormData, OfferFormData } from '@shared/schema';
 import { nudgePageFormSchema, offerFormSchema } from '@shared/schema';
+import useEmblaCarousel from 'embla-carousel-react';
 
 export default function PageBuilderPage() {
   const { toast } = useToast();
@@ -454,37 +455,45 @@ export default function PageBuilderPage() {
                           <p className="text-lg opacity-90 font-light">{contentSubheadline}</p>
                         </div>
                         
-                        {/* Offers Section */}
+                        {/* Offers Carousel Preview */}
                         {offers.length > 0 ? (
-                          <div className="w-full max-w-md space-y-3">
+                          <div className="w-full max-w-md">
                             <div className="flex items-center gap-2 mb-4">
-                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
-                              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 px-3">
-                                Links
+                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                              <span className="text-xs font-semibold px-3 opacity-75">
+                                Swipe Carousel →
                               </span>
-                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
                             </div>
-                            {offers
-                              .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
-                              .filter((offer: any) => offer.isActive)
-                              .map((offer: any) => (
-                                <div 
-                                  key={offer.id}
-                                  className="bg-white/5 hover:bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1 text-left">
-                                      <div className="font-bold text-base group-hover:text-purple-300 transition-colors">{offer.title}</div>
-                                      {offer.description && (
-                                        <div className="text-sm opacity-60 mt-1">{offer.description}</div>
-                                      )}
-                                    </div>
-                                    <div className="ml-3 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
-                                      →
+                            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+                              {offers
+                                .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                                .filter((offer: any) => offer.isActive)
+                                .map((offer: any) => (
+                                  <div 
+                                    key={offer.id}
+                                    className="flex-[0_0_75%] snap-start"
+                                  >
+                                    <div className="bg-white/10 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-xl">
+                                      <div className="text-left">
+                                        <div className="font-bold text-lg mb-2">{offer.title}</div>
+                                        {offer.description && (
+                                          <div className="text-sm opacity-75 mb-3 line-clamp-2">{offer.description}</div>
+                                        )}
+                                        <div className="flex items-center justify-between">
+                                          <Badge className="bg-white/20 text-white text-xs border-white/30">
+                                            {offer.type.replace('_', ' ')}
+                                          </Badge>
+                                          <div className="text-xl opacity-75">
+                                            →
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                            </div>
+                            <p className="text-xs opacity-60 text-center mt-2">← Swipe to see more →</p>
                           </div>
                         ) : (
                           <div className="w-full max-w-md">
