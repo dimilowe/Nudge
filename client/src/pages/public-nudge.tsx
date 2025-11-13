@@ -311,6 +311,18 @@ export default function PublicNudgePage() {
   const headline = heroSection?.headline || page.title;
   const subheadline = heroSection?.subheadline || page.description || '';
 
+  // Get top 10 offers to display (prioritize routed offer first)
+  const topOffers = [...offers]
+    .sort((a: any, b: any) => {
+      // Routed offer goes first
+      if (offer && a.id === offer.id) return -1;
+      if (offer && b.id === offer.id) return 1;
+      // Then sort by displayOrder
+      return (a.displayOrder || 0) - (b.displayOrder || 0);
+    })
+    .filter((o: any) => o.isActive)
+    .slice(0, 10);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-white" data-testid="page-public-nudge">
       <div className="container mx-auto px-4 py-12 max-w-2xl">
@@ -335,8 +347,64 @@ export default function PublicNudgePage() {
           )}
         </div>
 
-        {/* Offers Carousel */}
-        {offers.length > 0 && <OffersCarousel offers={offers} onOfferClick={handleOfferClick} />}
+        {/* Top 10 AI-Selected Links */}
+        {topOffers.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+              <span className="text-sm font-semibold px-3 opacity-90">
+                {offer ? '🎯 Smart Picks For You' : 'Links'}
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            </div>
+            
+            <div className="space-y-3">
+              {topOffers.map((displayOffer: any, index: number) => (
+                <button
+                  key={displayOffer.id}
+                  onClick={() => handleOfferClick(displayOffer)}
+                  className={`w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm p-5 rounded-2xl border transition-all group ${
+                    offer && displayOffer.id === offer.id 
+                      ? 'border-yellow-400/50 bg-white/15' 
+                      : 'border-white/10 hover:border-purple-500/50'
+                  }`}
+                  data-testid={`button-top-offer-${index}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 text-left">
+                      <div className="font-bold text-lg group-hover:text-purple-200 transition-colors flex items-center gap-2">
+                        {offer && displayOffer.id === offer.id && (
+                          <span className="text-yellow-400">⭐</span>
+                        )}
+                        {displayOffer.title}
+                      </div>
+                      {displayOffer.description && (
+                        <div className="text-sm opacity-75 mt-1">{displayOffer.description}</div>
+                      )}
+                    </div>
+                    <div className="ml-4 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                      →
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* All Offers Carousel */}
+        {offers.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+              <span className="text-sm font-semibold px-3 opacity-90">
+                Explore All →
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            </div>
+            <OffersCarousel offers={offers} onOfferClick={handleOfferClick} />
+          </div>
+        )}
         
         {offers.length === 0 && (
           <div className="text-center py-12">
