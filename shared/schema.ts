@@ -29,6 +29,7 @@ export const nudgePages = pgTable("nudge_pages", {
   title: text("title").notNull(),
   description: text("description"),
   theme: jsonb("theme"), // colors, fonts, etc.
+  content: jsonb("content"), // landing page content: headline, subheadline, ctaText, heroImage, backgroundColor, etc.
   defaultOfferId: varchar("default_offer_id"),
   isPublished: boolean("is_published").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -141,6 +142,31 @@ export const overlayContentSchema = z.object({
   description: z.string().optional(),
 });
 
+// Page content schemas (versioned layout system)
+export const heroSectionSchema = z.object({
+  type: z.literal("hero"),
+  headline: z.string().default(""),
+  subheadline: z.string().default(""),
+  ctaText: z.string().default("Get Started"),
+  ctaHref: z.string().default(""),
+  heroImage: z.string().optional(),
+  backgroundColor: z.string().default("gradient"), // 'gradient' | 'solid' | 'image'
+  backgroundImage: z.string().optional(),
+});
+
+export const pageContentSchema = z.object({
+  version: z.number().default(1),
+  sections: z.array(z.discriminatedUnion("type", [heroSectionSchema])),
+});
+
+export const pageThemeSchema = z.object({
+  primaryColor: z.string().default("#9333ea"), // purple
+  secondaryColor: z.string().default("#3b82f6"), // blue
+  accentColor: z.string().default("#ec4899"), // pink
+  fontFamily: z.string().default("system-ui"),
+  buttonStyle: z.enum(["rounded", "sharp", "pill"]).default("rounded"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -244,6 +270,11 @@ export const nudgePageFormSchema = z.object({
   slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
 });
 
+export const pageContentUpdateSchema = z.object({
+  content: pageContentSchema.optional(),
+  theme: pageThemeSchema.optional(),
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -281,3 +312,7 @@ export type NudgePageFormData = z.infer<typeof nudgePageFormSchema>;
 export type RoutingConditions = z.infer<typeof routingConditionsSchema>;
 export type TriggerConfig = z.infer<typeof triggerConfigSchema>;
 export type OverlayContent = z.infer<typeof overlayContentSchema>;
+export type HeroSection = z.infer<typeof heroSectionSchema>;
+export type PageContent = z.infer<typeof pageContentSchema>;
+export type PageTheme = z.infer<typeof pageThemeSchema>;
+export type PageContentUpdate = z.infer<typeof pageContentUpdateSchema>;

@@ -279,12 +279,104 @@ export default function PageBuilderPage() {
         {/* Page Editor */}
         <Card className="glass-card p-6 lg:col-span-2 hover:shadow-2xl transition-shadow">
           {selectedPage ? (
-            <Tabs defaultValue="offers" className="w-full">
+            <Tabs defaultValue="content" className="w-full">
               <TabsList>
+                <TabsTrigger value="content" data-testid="tab-content">Content</TabsTrigger>
                 <TabsTrigger value="offers" data-testid="tab-offers">Offers</TabsTrigger>
                 <TabsTrigger value="rules" data-testid="tab-rules">Routing Rules</TabsTrigger>
                 <TabsTrigger value="automations" data-testid="tab-automations">Automations</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="content" className="mt-6">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-gradient mb-2">Landing Page Content</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Design your page's hero section that visitors will see first
+                    </p>
+                  </div>
+
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* Content Editor */}
+                    <Card className="p-5 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-900/10 dark:to-blue-900/10 border-purple-200/50">
+                      <h4 className="font-bold mb-4 text-gradient">Edit Content</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Headline</label>
+                          <Input 
+                            placeholder="Your Amazing Headline" 
+                            className="mt-1.5"
+                            data-testid="input-content-headline"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Subheadline</label>
+                          <Input 
+                            placeholder="Supporting text that explains your offer" 
+                            className="mt-1.5"
+                            data-testid="input-content-subheadline"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">CTA Button Text</label>
+                          <Input 
+                            placeholder="Get Started" 
+                            className="mt-1.5"
+                            data-testid="input-content-cta-text"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">CTA Button Link</label>
+                          <Input 
+                            placeholder="https://..." 
+                            className="mt-1.5"
+                            data-testid="input-content-cta-href"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Background Style</label>
+                          <Select defaultValue="gradient">
+                            <SelectTrigger className="mt-1.5" data-testid="select-background-style">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="gradient">Purple/Blue Gradient</SelectItem>
+                              <SelectItem value="solid">Solid Color</SelectItem>
+                              <SelectItem value="image">Background Image</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button className="w-full gradient-primary text-white" data-testid="button-save-content">
+                          Save Content
+                        </Button>
+                      </div>
+                    </Card>
+
+                    {/* Live Preview */}
+                    <Card className="p-5 bg-gradient-to-br from-purple-600 to-blue-600 text-white relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
+                      <div className="relative z-10">
+                        <div className="text-xs font-semibold mb-3 opacity-75">LIVE PREVIEW</div>
+                        <h2 className="text-3xl font-bold mb-3">Your Amazing Headline</h2>
+                        <p className="text-lg opacity-90 mb-6">Supporting text that explains your offer</p>
+                        <button className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg hover:shadow-xl transition-shadow">
+                          Get Started
+                        </button>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10 rounded-lg border border-purple-200/50">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                      💡
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Pro Tip: Test your headline with different traffic sources</p>
+                      <p className="text-xs text-muted-foreground">Different visitors from TikTok vs YouTube may respond to different messaging</p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
 
               <TabsContent value="offers" className="mt-6">
                 <div className="flex items-center justify-between mb-4">

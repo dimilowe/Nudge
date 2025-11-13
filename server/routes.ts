@@ -10,6 +10,7 @@ import {
   nudgePageFormSchema,
   offerFormSchema,
   automationFormSchema,
+  pageContentUpdateSchema,
   type RoutingConditions,
 } from "@shared/schema";
 
@@ -234,6 +235,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Page update error:", error);
       return res.status(400).json({ error: "Failed to update page" });
+    }
+  });
+  
+  // PATCH /api/pages/:id/content - Update page content/theme
+  app.patch("/api/pages/:id/content", async (req, res) => {
+    try {
+      const validated = pageContentUpdateSchema.parse(req.body);
+      const page = await storage.updateNudgePage(req.params.id, validated);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      return res.json({ page });
+    } catch (error) {
+      console.error("Page content update error:", error);
+      return res.status(400).json({ error: "Failed to update page content" });
     }
   });
   
