@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -117,12 +117,22 @@ export default function PageBuilderPage() {
   const pageForm = useForm<NudgePageFormData & { creatorId: string }>({
     resolver: zodResolver(nudgePageFormSchema.extend({ creatorId: nudgePageFormSchema.shape.creatorId })),
     defaultValues: {
-      creatorId: creator?.id || '',
+      creatorId: '',
       title: '',
       description: '',
       slug: '',
     },
   });
+
+  // Set creatorId when creator loads
+  useEffect(() => {
+    if (creator?.id) {
+      pageForm.setValue('creatorId', creator.id, { 
+        shouldDirty: true, 
+        shouldValidate: true 
+      });
+    }
+  }, [creator?.id, pageForm]);
 
   // New offer form
   const offerForm = useForm<OfferFormData>({
@@ -140,7 +150,11 @@ export default function PageBuilderPage() {
   });
 
   const onCreatePage = (data: NudgePageFormData & { creatorId: string }) => {
-    createPageMutation.mutate(data);
+    if (!creator?.id) {
+      toast({ title: 'Error: Creator not loaded', variant: 'destructive' });
+      return;
+    }
+    createPageMutation.mutate({ ...data, creatorId: creator.id });
   };
 
   const onCreateOffer = (data: OfferFormData) => {
@@ -149,19 +163,20 @@ export default function PageBuilderPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl" data-testid="page-page-builder">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" data-testid="text-page-title">Page Builder</h1>
-        <p className="text-muted-foreground" data-testid="text-page-description">
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Page Builder</h1>
+        <p className="text-lg text-muted-foreground" data-testid="text-page-description">
           Create and manage your Nudge pages and offers
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pages List */}
-        <Card className="p-6 lg:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Your Pages</h3>
+        <Card className="glass-card p-6 lg:col-span-1 hover:shadow-2xl transition-shadow">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-bold text-gradient">Your Pages</h3>
             <Button 
+              className="gradient-primary text-white shadow-lg shadow-purple-500/30"
               size="sm" 
               onClick={() => setShowNewPageForm(!showNewPageForm)}
               data-testid="button-new-page"
@@ -172,10 +187,21 @@ export default function PageBuilderPage() {
           </div>
 
           {showNewPageForm && (
-            <Card className="p-4 mb-4 bg-muted">
-              <h4 className="font-semibold mb-3">Create New Page</h4>
+            <Card className="p-4 mb-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200/50">
+              <h4 className="font-bold mb-4 text-gradient">Create New Page</h4>
               <Form {...pageForm}>
                 <form onSubmit={pageForm.handleSubmit(onCreatePage)} className="space-y-3">
+                  <FormField
+                    control={pageForm.control}
+                    name="creatorId"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormControl>
+                          <Input type="hidden" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={pageForm.control}
                     name="title"
@@ -203,8 +229,14 @@ export default function PageBuilderPage() {
                     )}
                   />
                   <div className="flex gap-2">
-                    <Button type="submit" size="sm" data-testid="button-create-page">
-                      Create
+                    <Button 
+                      type="submit" 
+                      size="sm" 
+                      disabled={!creator?.id || createPageMutation.isPending}
+                      className="gradient-primary text-white"
+                      data-testid="button-create-page"
+                    >
+                      {createPageMutation.isPending ? 'Creating...' : 'Create'}
                     </Button>
                     <Button 
                       type="button" 
@@ -220,20 +252,20 @@ export default function PageBuilderPage() {
             </Card>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {pages.map((page: any) => (
               <button
                 key={page.id}
                 onClick={() => setSelectedPageId(page.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                className={`w-full text-left p-4 rounded-xl transition-all font-medium ${
                   selectedPageId === page.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted hover:bg-muted/80'
+                    ? 'gradient-primary text-white shadow-lg shadow-purple-500/30'
+                    : 'bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 hover:shadow-md'
                 }`}
                 data-testid={`button-page-${page.slug}`}
               >
-                <div className="font-semibold">{page.title}</div>
-                <div className="text-sm opacity-80">/{page.slug}</div>
+                <div className="font-bold">{page.title}</div>
+                <div className="text-sm mt-1 opacity-90">/{page.slug}</div>
               </button>
             ))}
             {pages.length === 0 && !showNewPageForm && (
@@ -245,7 +277,7 @@ export default function PageBuilderPage() {
         </Card>
 
         {/* Page Editor */}
-        <Card className="p-6 lg:col-span-2">
+        <Card className="glass-card p-6 lg:col-span-2 hover:shadow-2xl transition-shadow">
           {selectedPage ? (
             <Tabs defaultValue="offers" className="w-full">
               <TabsList>
