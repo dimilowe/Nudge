@@ -435,14 +435,23 @@ export default function PageBuilderPage() {
                     </Card>
 
                     {/* Live Preview - Link-in-bio Style */}
-                    <Card className="p-0 bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900 text-white relative overflow-hidden border-slate-700">
+                    <Card className="p-0 bg-gradient-to-br from-purple-600 to-blue-600 text-white relative overflow-hidden border-purple-500">
                       <div className="relative z-10 p-8 flex flex-col items-center text-center min-h-[500px]">
-                        <div className="text-xs font-semibold mb-6 opacity-50 uppercase tracking-wider">LIVE PREVIEW</div>
+                        <div className="text-xs font-semibold mb-6 opacity-75 uppercase tracking-wider">LIVE PREVIEW</div>
                         
-                        {/* Hero Section */}
+                        {/* Hero Image Card */}
+                        <div className="w-full max-w-md mb-8">
+                          <div className="bg-white rounded-3xl p-8 shadow-2xl">
+                            <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
+                              <div className="text-6xl">📸</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Hero Text */}
                         <div className="mb-8 w-full max-w-md">
                           <h1 className="text-5xl font-black mb-3 tracking-tight">{contentHeadline}</h1>
-                          <p className="text-lg opacity-70 font-light">{contentSubheadline}</p>
+                          <p className="text-lg opacity-90 font-light">{contentSubheadline}</p>
                         </div>
                         
                         {/* Offers Section */}

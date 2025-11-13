@@ -231,10 +231,10 @@ export default function PublicNudgePage() {
 
   if (!page) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900">
-        <Card className="p-8 text-center bg-white/5 border-white/10 text-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600">
+        <Card className="p-8 text-center bg-white/10 backdrop-blur-sm border-white/20 text-white">
           <h2 className="text-2xl font-bold mb-2">Page Not Found</h2>
-          <p className="opacity-70">The page you're looking for doesn't exist.</p>
+          <p className="opacity-90">The page you're looking for doesn't exist.</p>
         </Card>
       </div>
     );
@@ -247,15 +247,24 @@ export default function PublicNudgePage() {
   const subheadline = heroSection?.subheadline || page.description || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-900/20 to-slate-900 text-white" data-testid="page-public-nudge">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-white" data-testid="page-public-nudge">
       <div className="container mx-auto px-4 py-12 max-w-2xl">
-        {/* Hero Section */}
+        {/* Hero Image Card */}
+        <div className="mb-8">
+          <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md mx-auto">
+            <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
+              <div className="text-6xl">📸</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Hero Text */}
         <div className="text-center mb-12">
           <h1 className="text-6xl font-black mb-4 tracking-tight" data-testid="text-page-title">
             {headline}
           </h1>
           {subheadline && (
-            <p className="text-xl opacity-70 font-light" data-testid="text-page-description">
+            <p className="text-xl opacity-90 font-light" data-testid="text-page-description">
               {subheadline}
             </p>
           )}
