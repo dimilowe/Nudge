@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRoute } from 'wouter';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tantml:parameter>
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { X } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import useEmblaCarousel from 'embla-carousel-react';
+import { OverlayPanel } from '@/components/OverlayPanel';
 
 // Detect device type
 function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
