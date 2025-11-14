@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRoute } from 'wouter';
-import { useQuery, useMutation } from '@tantml:parameter>
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -160,6 +160,8 @@ export default function PublicNudgePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [overlayOffer, setOverlayOffer] = useState<any>(null);
+  const [showFloatingPanel, setShowFloatingPanel] = useState(false);
+  const [floatingPanelCollapsed, setFloatingPanelCollapsed] = useState(true);
   const scrollDepth = useScrollTracking(sessionId);
   const timeOnPage = useTimeTracking(sessionId);
 
@@ -245,6 +247,10 @@ export default function PublicNudgePage() {
         eventType: 'offer_view',
         meta: { offerId: offer.id },
       });
+      
+      // Show floating panel with smart-routed offer
+      setShowFloatingPanel(true);
+      setFloatingPanelCollapsed(false); // Auto-expand when offer appears
     }
   }, [offer?.id, sessionId]);
 
@@ -428,7 +434,7 @@ export default function PublicNudgePage() {
         )}
       </div>
 
-      {/* Overlay Dialog */}
+      {/* Overlay Dialog (for automations) */}
       <Dialog open={showOverlay} onOpenChange={setShowOverlay}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-overlay">
           <DialogHeader>
@@ -455,6 +461,44 @@ export default function PublicNudgePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Overlay Panel (glass-morphism style) */}
+      {showFloatingPanel && offer && (
+        <OverlayPanel
+          isCollapsed={floatingPanelCollapsed}
+          onCollapsedChange={setFloatingPanelCollapsed}
+          onClose={() => setShowFloatingPanel(false)}
+          title="Smart Pick For You"
+        >
+          <div className="space-y-4">
+            {/* Offer Card in Panel */}
+            <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-lg border border-white/20">
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-xl">⭐</span>
+                <div className="flex-1">
+                  <h3 className="font-bold text-sm mb-1">{offer.title}</h3>
+                  {offer.description && (
+                    <p className="text-xs opacity-80 line-clamp-2 mb-3">{offer.description}</p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    onClick={() => handleOfferClick(offer)}
+                    data-testid="button-floating-offer"
+                  >
+                    {offer.cta || 'Check it out'} →
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Info Text */}
+            <div className="text-xs opacity-60 text-center px-2">
+              <p>💡 This offer was specially selected based on your profile</p>
+            </div>
+          </div>
+        </OverlayPanel>
+      )}
     </div>
   );
 }

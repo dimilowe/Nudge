@@ -5,6 +5,7 @@ interface OverlayPanelProps {
   children?: React.ReactNode;
   isCollapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  onClose?: () => void;
   title?: string;
 }
 
@@ -12,6 +13,7 @@ export function OverlayPanel({
   children, 
   isCollapsed: controlledCollapsed,
   onCollapsedChange,
+  onClose,
   title = 'Suggestions'
 }: OverlayPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(controlledCollapsed ?? true);
@@ -33,10 +35,15 @@ export function OverlayPanel({
     }
   }, []);
 
-  // Sync controlled collapsed state
+  // Sync controlled collapsed state and re-constrain position
   useEffect(() => {
     if (controlledCollapsed !== undefined) {
       setIsCollapsed(controlledCollapsed);
+      
+      // Re-constrain position when state changes to prevent off-screen rendering
+      const width = controlledCollapsed ? 48 : 300;
+      const height = controlledCollapsed ? 48 : 400;
+      setPosition(prevPos => constrainPosition(prevPos, width, height));
     }
   }, [controlledCollapsed]);
 
@@ -163,9 +170,7 @@ export function OverlayPanel({
           </div>
           {!isCollapsed && (
             <button
-              onClick={() => {
-                // You can add close functionality here
-              }}
+              onClick={onClose}
               className="p-1 hover:bg-white/10 rounded transition-colors opacity-60 hover:opacity-100"
               data-testid="button-close-panel"
             >
