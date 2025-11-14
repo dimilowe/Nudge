@@ -455,47 +455,92 @@ export default function PageBuilderPage() {
                           <p className="text-lg opacity-90 font-light">{contentSubheadline}</p>
                         </div>
                         
-                        {/* Offers Carousel Preview */}
-                        {offers.length > 0 ? (
-                          <div className="w-full max-w-md">
-                            <div className="flex items-center gap-2 mb-4">
-                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-                              <span className="text-xs font-semibold px-3 opacity-75">
-                                Swipe Carousel →
-                              </span>
-                              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                        {/* Top 10 Link Slots Preview */}
+                        {offers.length > 0 && (
+                          <>
+                            <div className="w-full max-w-md mb-8">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                                <span className="text-xs font-semibold px-3 opacity-75">
+                                  🎯 Smart Picks For You
+                                </span>
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {offers
+                                  .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                                  .filter((offer: any) => offer.isActive)
+                                  .slice(0, 10)
+                                  .map((offer: any, index: number) => (
+                                    <div
+                                      key={offer.id}
+                                      className={`w-full bg-white/10 backdrop-blur-sm p-4 rounded-2xl border transition-all ${
+                                        index === 0 
+                                          ? 'border-yellow-400/50 bg-white/15' 
+                                          : 'border-white/10'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1 text-left">
+                                          <div className="font-bold text-sm flex items-center gap-2">
+                                            {index === 0 && <span className="text-yellow-400">⭐</span>}
+                                            {offer.title}
+                                          </div>
+                                          {offer.description && (
+                                            <div className="text-xs opacity-75 mt-1 line-clamp-1">{offer.description}</div>
+                                          )}
+                                        </div>
+                                        <div className="ml-3 text-lg opacity-60">→</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
                             </div>
-                            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-                              {offers
-                                .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
-                                .filter((offer: any) => offer.isActive)
-                                .map((offer: any) => (
-                                  <div 
-                                    key={offer.id}
-                                    className="flex-[0_0_75%] snap-start"
-                                  >
-                                    <div className="bg-white/10 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-xl">
-                                      <div className="text-left">
-                                        <div className="font-bold text-lg mb-2">{offer.title}</div>
-                                        {offer.description && (
-                                          <div className="text-sm opacity-75 mb-3 line-clamp-2">{offer.description}</div>
-                                        )}
-                                        <div className="flex items-center justify-between">
-                                          <Badge className="bg-white/20 text-white text-xs border-white/30">
-                                            {offer.type.replace('_', ' ')}
-                                          </Badge>
-                                          <div className="text-xl opacity-75">
-                                            →
+
+                            {/* Offers Carousel Preview */}
+                            <div className="w-full max-w-md">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                                <span className="text-xs font-semibold px-3 opacity-75">
+                                  Explore All →
+                                </span>
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                              </div>
+                              <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+                                {offers
+                                  .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                                  .filter((offer: any) => offer.isActive)
+                                  .map((offer: any) => (
+                                    <div 
+                                      key={offer.id}
+                                      className="flex-[0_0_75%] snap-start"
+                                    >
+                                      <div className="bg-white/10 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-xl">
+                                        <div className="text-left">
+                                          <div className="font-bold text-lg mb-2">{offer.title}</div>
+                                          {offer.description && (
+                                            <div className="text-sm opacity-75 mb-3 line-clamp-2">{offer.description}</div>
+                                          )}
+                                          <div className="flex items-center justify-between">
+                                            <Badge className="bg-white/20 text-white text-xs border-white/30">
+                                              {offer.type.replace('_', ' ')}
+                                            </Badge>
+                                            <div className="text-xl opacity-75">
+                                              →
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                              </div>
+                              <p className="text-xs opacity-60 text-center mt-2">← Swipe to see more →</p>
                             </div>
-                            <p className="text-xs opacity-60 text-center mt-2">← Swipe to see more →</p>
-                          </div>
-                        ) : (
+                          </>
+                        )}
+                        
+                        {offers.length === 0 && (
                           <div className="w-full max-w-md">
                             <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-dashed border-white/20">
                               <p className="text-sm opacity-60">
