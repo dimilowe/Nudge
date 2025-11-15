@@ -924,14 +924,14 @@ export default function PublicNudgePage() {
 
         {/* Scroll Tracking Debug Info (dev only) */}
         {process.env.NODE_ENV === 'development' && (
-          <Card className="p-4 bg-muted">
-            <div className="text-xs space-y-1">
+          <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/20">
+            <div className="text-xs space-y-1 opacity-80">
               <div>Session ID: {sessionId || 'Loading...'}</div>
               <div>Scroll Depth: {scrollDepth}%</div>
               <div>Time on Page: {timeOnPage}s</div>
               <div>Automations: {automations.length}</div>
             </div>
-          </Card>
+          </div>
         )}
       </div>
 
