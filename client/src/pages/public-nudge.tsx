@@ -520,6 +520,16 @@ function OffersCarousel({ offers, onOfferClick }: { offers: any[]; onOfferClick:
                 data-testid={`button-offer-${offer.id}`}
               >
                 <div className="text-left">
+                  {/* Offer Image */}
+                  {offer.imageUrl && (
+                    <div className="mb-4">
+                      <img 
+                        src={offer.imageUrl} 
+                        alt={offer.title}
+                        className="w-full h-32 object-cover rounded-xl"
+                      />
+                    </div>
+                  )}
                   <div className="font-bold text-xl group-hover:text-purple-200 transition-colors mb-2">
                     {offer.title}
                   </div>
@@ -858,7 +868,17 @@ export default function PublicNudgePage() {
                   }`}
                   data-testid={`button-top-offer-${index}`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* Offer Image */}
+                    {displayOffer.imageUrl && (
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={displayOffer.imageUrl} 
+                          alt={displayOffer.title}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
                     <div className="flex-1 text-left">
                       <div className="font-bold text-lg group-hover:text-purple-200 transition-colors flex items-center gap-2">
                         {offer && displayOffer.id === offer.id && (
@@ -870,7 +890,7 @@ export default function PublicNudgePage() {
                         <div className="text-sm opacity-75 mt-1">{displayOffer.description}</div>
                       )}
                     </div>
-                    <div className="ml-4 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                    <div className="ml-4 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all flex-shrink-0">
                       →
                     </div>
                   </div>

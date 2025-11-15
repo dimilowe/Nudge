@@ -1153,6 +1153,16 @@ export default function PageBuilderPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3 flex-1">
                           <GripVertical className="h-5 w-5 text-muted-foreground mt-1" />
+                          {/* Offer Image Thumbnail */}
+                          {offer.imageUrl && (
+                            <div className="flex-shrink-0">
+                              <img 
+                                src={offer.imageUrl} 
+                                alt={offer.title}
+                                className="w-16 h-16 object-cover rounded-lg border"
+                              />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <h4 className="font-semibold" data-testid={`text-offer-title-${index}`}>
