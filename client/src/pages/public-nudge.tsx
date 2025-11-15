@@ -56,6 +56,34 @@ function useScrollTracking(sessionId: string | null) {
   return maxScrollDepth;
 }
 
+// Track mouse pause duration (for hesitation triggers)
+function useMousePauseDuration(sessionId: string | null): number {
+  const [pauseDuration, setPauseDuration] = useState(0);
+  const lastMoveTimeRef = useRef(Date.now());
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const handleMouseMove = () => {
+      lastMoveTimeRef.current = Date.now();
+      setPauseDuration(0);
+    };
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - lastMoveTimeRef.current) / 1000; // in seconds
+      setPauseDuration(elapsed);
+    }, 100); // Check every 100ms
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      clearInterval(interval);
+    };
+  }, [sessionId]);
+
+  return pauseDuration;
+}
+
 // Track time on page
 function useTimeTracking(sessionId: string | null) {
   const [timeOnPage, setTimeOnPage] = useState(0);
@@ -87,6 +115,195 @@ function useTimeTracking(sessionId: string | null) {
   }, [sessionId]);
 
   return timeOnPage;
+}
+
+// Offer Deck Component - Swipeable card stack for the overlay panel
+function OfferDeck({ 
+  offers, 
+  selectedOffer, 
+  onOfferClick,
+  sessionId,
+  trackEvent
+}: { 
+  offers: any[]; 
+  selectedOffer: any | null;
+  onOfferClick: (offer: any) => void;
+  sessionId: string | null;
+  trackEvent: (event: any) => void;
+}) {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [emblaRef] = useEmblaCarousel({ 
+    loop: false, 
+    align: 'start',
+    slidesToScroll: 1,
+  });
+
+  const activeOffers = offers
+    .filter((o: any) => o.isActive)
+    .sort((a: any, b: any) => {
+      // Selected offer goes first
+      if (selectedOffer && a.id === selectedOffer.id) return -1;
+      if (selectedOffer && b.id === selectedOffer.id) return 1;
+      return (a.displayOrder || 0) - (b.displayOrder || 0);
+    });
+
+  // Get unique categories
+  const categories = Array.from(new Set(activeOffers.map((o: any) => o.type)));
+  
+  // Filter by category if selected (show all when no category selected)
+  // Always include the Smart Pick offer even if it doesn't match the selected category
+  const filteredOffers = !selectedCategory
+    ? activeOffers
+    : activeOffers.filter((o: any) => {
+        // Always show the selected offer (Smart Pick)
+        if (selectedOffer && o.id === selectedOffer.id) return true;
+        // Otherwise filter by category
+        return o.type === selectedCategory;
+      });
+
+  // Track category selection
+  const handleCategorySelect = (category: string | null) => {
+    setSelectedCategory(category);
+    if (sessionId) {
+      trackEvent({
+        sessionId,
+        eventType: 'category_selected',
+        meta: { category },
+      });
+    }
+  };
+
+  if (!selectedOffer && filteredOffers.length === 0) {
+    return (
+      <div className="text-center py-6 px-4">
+        <div className="text-4xl mb-3">✨</div>
+        <p className="text-sm opacity-80 mb-1">Browse around!</p>
+        <p className="text-xs opacity-60">We'll surface picks as you explore</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Category Filter Pills */}
+      {categories.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => handleCategorySelect(null)}
+            className={`px-3 py-1 text-xs rounded-full whitespace-nowrap transition-all ${
+              !selectedCategory
+                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                : 'bg-white/10 hover:bg-white/20'
+            }`}
+            data-testid="button-category-all"
+          >
+            All
+          </button>
+          {categories.map((cat: any) => (
+            <button
+              key={cat}
+              onClick={() => handleCategorySelect(cat)}
+              className={`px-3 py-1 text-xs rounded-full whitespace-nowrap transition-all ${
+                selectedCategory === cat
+                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                  : 'bg-white/10 hover:bg-white/20'
+              }`}
+              data-testid={`button-category-${cat}`}
+            >
+              {cat.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Swipeable Offer Cards */}
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex gap-3">
+          {filteredOffers.slice(0, 5).map((offer: any) => (
+            <div
+              key={offer.id}
+              className="flex-[0_0_100%] min-w-0"
+            >
+              <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
+                <div className="flex items-start gap-3 mb-3">
+                  {offer.imageUrl ? (
+                    <img 
+                      src={offer.imageUrl} 
+                      alt={offer.title}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-2xl">
+                      {offer.type === 'digital_product' ? '📦' : 
+                       offer.type === 'freebie' ? '🎁' :
+                       offer.type === 'coaching' ? '💡' :
+                       offer.type === 'bundle' ? '🎯' :
+                       offer.type === 'affiliate' ? '🔗' : '✨'}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-sm mb-1 line-clamp-1">{offer.title}</h3>
+                    {offer.price && (
+                      <p className="text-xs font-semibold text-purple-300">${offer.price}</p>
+                    )}
+                  </div>
+                  {selectedOffer?.id === offer.id && (
+                    <Badge className="bg-purple-500/50 text-white border-purple-400 text-xs">
+                      Smart Pick
+                    </Badge>
+                  )}
+                </div>
+
+                {offer.description && (
+                  <p className="text-xs opacity-80 line-clamp-2 mb-3">
+                    {offer.description}
+                  </p>
+                )}
+
+                <Button
+                  size="sm"
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg"
+                  onClick={() => onOfferClick(offer)}
+                  data-testid={`button-deck-offer-${offer.id}`}
+                >
+                  {offer.cta || 'Check it out'} →
+                </Button>
+
+                {/* Offer Type Badge */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
+                  <Badge className="bg-white/10 text-white border-white/20 text-xs">
+                    {offer.type.replace('_', ' ')}
+                  </Badge>
+                  {offer.funnelStage && (
+                    <span className="text-xs opacity-60">
+                      {offer.funnelStage === 'awareness' ? '🌱' :
+                       offer.funnelStage === 'consideration' ? '🤔' :
+                       offer.funnelStage === 'core' ? '⭐' :
+                       offer.funnelStage === 'upsell' ? '💎' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Swipe Indicator */}
+      {filteredOffers.length > 1 && (
+        <div className="text-center">
+          <p className="text-xs opacity-50">← Swipe for more →</p>
+        </div>
+      )}
+
+      {/* Smart Pick Info */}
+      {selectedOffer && (
+        <div className="text-xs opacity-60 text-center px-2 pt-2 border-t border-white/10">
+          <p>💡 This offer was specially selected for you</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Offers Carousel Component
@@ -166,6 +383,7 @@ export default function PublicNudgePage() {
   const panelClaimedRef = useRef(false); // Prevents race condition in automation loop
   const scrollDepth = useScrollTracking(sessionId);
   const timeOnPage = useTimeTracking(sessionId);
+  const mousePauseDuration = useMousePauseDuration(sessionId);
 
   // Fetch page data
   const { data: pageData } = useQuery({
@@ -281,6 +499,18 @@ export default function PublicNudgePage() {
         shouldTrigger = timeOnPage >= config.seconds;
       }
 
+      // User hesitation trigger (respect configured threshold, default to 3 seconds)
+      if (automation.triggerType === 'user_hesitation') {
+        const threshold = config.hesitationSeconds || 3;
+        shouldTrigger = mousePauseDuration >= threshold;
+      }
+
+      // Bottom proximity trigger (respect configured threshold, default to 80%)
+      if (automation.triggerType === 'bottom_proximity') {
+        const threshold = config.scrollPercent || 80;
+        shouldTrigger = scrollDepth >= threshold;
+      }
+
       // If this automation should trigger, claim the panel immediately
       if (shouldTrigger) {
         const targetOffer = offers.find((o: any) => o.id === automation.offerId);
@@ -302,7 +532,7 @@ export default function PublicNudgePage() {
         }
       }
     }
-  }, [scrollDepth, timeOnPage, automations, sessionId, triggeredAutomations, offers]);
+  }, [scrollDepth, timeOnPage, mousePauseDuration, automations, sessionId, triggeredAutomations, offers]);
 
   // Track offer click
   const handleOfferClick = (clickedOffer: any) => {
@@ -495,41 +725,13 @@ export default function PublicNudgePage() {
           }}
           title={panelOffer ? "Smart Pick For You" : "Nudge"}
         >
-          {panelOffer ? (
-            <div className="space-y-4">
-              {/* Offer Card in Panel */}
-              <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-lg border border-white/20">
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-xl">⭐</span>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-sm mb-1">{panelOffer.title}</h3>
-                    {panelOffer.description && (
-                      <p className="text-xs opacity-80 line-clamp-2 mb-3">{panelOffer.description}</p>
-                    )}
-                    <Button
-                      size="sm"
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                      onClick={() => handleOfferClick(panelOffer)}
-                      data-testid="button-floating-offer"
-                    >
-                      {panelOffer.cta || 'Check it out'} →
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Info Text */}
-              <div className="text-xs opacity-60 text-center px-2">
-                <p>💡 This offer was specially selected for you</p>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 px-4">
-              <div className="text-4xl mb-3">✨</div>
-              <p className="text-sm opacity-80 mb-1">Browse around!</p>
-              <p className="text-xs opacity-60">We'll surface picks as you explore</p>
-            </div>
-          )}
+          <OfferDeck
+            offers={offers}
+            selectedOffer={panelOffer}
+            onOfferClick={handleOfferClick}
+            sessionId={sessionId}
+            trackEvent={trackEventMutation.mutate}
+          />
         </OverlayPanel>
       )}
     </div>

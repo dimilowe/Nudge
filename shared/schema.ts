@@ -70,8 +70,8 @@ export const automations = pgTable("automations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   pageId: varchar("page_id").notNull(),
   name: text("name").notNull(),
-  triggerType: text("trigger_type").notNull(), // 'scroll_depth' | 'time_on_page' | 'exit_intent' | 'section_view'
-  triggerConfig: jsonb("trigger_config").notNull(), // { scrollPercent?: number, seconds?: number, sectionId?: string }
+  triggerType: text("trigger_type").notNull(), // 'scroll_depth' | 'time_on_page' | 'exit_intent' | 'section_view' | 'user_hesitation' | 'bottom_proximity'
+  triggerConfig: jsonb("trigger_config").notNull(), // { scrollPercent?: number, seconds?: number, sectionId?: string, hesitationSeconds?: number }
   offerId: varchar("offer_id"), // which offer to show in the overlay
   overlayTemplate: text("overlay_template").notNull(), // 'popup' | 'slide_in' | 'banner' | 'toast'
   overlayContent: jsonb("overlay_content"), // custom headline, description overrides
@@ -134,6 +134,7 @@ export const triggerConfigSchema = z.object({
   scrollPercent: z.number().optional(),
   seconds: z.number().optional(),
   sectionId: z.string().optional(),
+  hesitationSeconds: z.number().optional(),
 });
 
 // Overlay content schema
@@ -228,7 +229,7 @@ export const sessionStartSchema = z.object({
 
 export const eventTrackSchema = z.object({
   sessionId: z.string(),
-  eventType: z.enum(["page_view", "scroll", "click", "exit_intent", "automation_triggered", "offer_view", "offer_click"]),
+  eventType: z.enum(["page_view", "scroll", "click", "exit_intent", "automation_triggered", "offer_view", "offer_click", "category_selected", "panel_close", "user_hesitation", "bottom_proximity"]),
   meta: z.record(z.any()).optional(),
 });
 
@@ -255,7 +256,7 @@ export const offerFormSchema = z.object({
 export const automationFormSchema = z.object({
   pageId: z.string(),
   name: z.string().min(1).max(100),
-  triggerType: z.enum(["scroll_depth", "time_on_page", "exit_intent", "section_view"]),
+  triggerType: z.enum(["scroll_depth", "time_on_page", "exit_intent", "section_view", "user_hesitation", "bottom_proximity"]),
   triggerConfig: triggerConfigSchema,
   offerId: z.string().optional(),
   overlayTemplate: z.enum(["popup", "slide_in", "banner", "toast"]),

@@ -25,16 +25,29 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import type { NudgePageFormData, OfferFormData } from '@shared/schema';
-import { nudgePageFormSchema, offerFormSchema } from '@shared/schema';
+import { nudgePageFormSchema, offerFormSchema, automationFormSchema } from '@shared/schema';
+import type { z } from 'zod';
 import useEmblaCarousel from 'embla-carousel-react';
+
+const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
 export default function PageBuilderPage() {
   const { toast } = useToast();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [showNewPageForm, setShowNewPageForm] = useState(false);
   const [showNewOfferForm, setShowNewOfferForm] = useState(false);
+  const [showAutomationDialog, setShowAutomationDialog] = useState(false);
+  const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
   
   // Content editor state
   const [contentHeadline, setContentHeadline] = useState('Your Amazing Headline');
@@ -118,6 +131,58 @@ export default function PageBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
       toast({ title: 'Offer deleted successfully!' });
+    },
+  });
+
+  // Fetch automations for selected page
+  const { data: automationsData } = useQuery({
+    queryKey: ['/api/automations', selectedPageId],
+    queryFn: async () => {
+      if (!selectedPageId) return { automations: [] };
+      const res = await fetch(`/api/automations?pageId=${selectedPageId}`);
+      return res.json();
+    },
+    enabled: !!selectedPageId,
+  });
+
+  const automations = automationsData?.automations || [];
+
+  // Create automation mutation
+  const createAutomationMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('POST', '/api/automations', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/automations', selectedPageId] });
+      toast({ title: 'Automation created successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to create automation', variant: 'destructive' });
+    },
+  });
+
+  // Update automation mutation
+  const updateAutomationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await apiRequest('PUT', `/api/automations/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/automations', selectedPageId] });
+      toast({ title: 'Automation updated successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update automation', variant: 'destructive' });
+    },
+  });
+
+  // Delete automation mutation
+  const deleteAutomationMutation = useMutation({
+    mutationFn: async (automationId: string) => {
+      return await apiRequest('DELETE', `/api/automations/${automationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/automations', selectedPageId] });
+      toast({ title: 'Automation deleted successfully!' });
     },
   });
   
@@ -204,6 +269,116 @@ export default function PageBuilderPage() {
 
   const onCreateOffer = (data: OfferFormData) => {
     createOfferMutation.mutate({ ...data, pageId: selectedPageId! });
+  };
+
+  // Automation form
+  type AutomationFormData = z.infer<typeof automationFormSchema>;
+  const automationForm = useForm<AutomationFormData>({
+    resolver: zodResolver(automationFormSchema),
+    defaultValues: {
+      pageId: selectedPageId || '',
+      name: '',
+      triggerType: 'scroll_depth',
+      offerId: undefined,
+      overlayTemplate: 'popup',
+      triggerConfig: {
+        scrollPercent: 50,
+      },
+    },
+  });
+
+  // Watch trigger type to show/hide conditional inputs
+  const triggerType = automationForm.watch('triggerType');
+
+  // Reset triggerConfig defaults when trigger type changes
+  useEffect(() => {
+    if (!showAutomationDialog) return; // Only reset when dialog is open
+
+    const currentConfig = automationForm.getValues('triggerConfig');
+    let newConfig = { ...currentConfig };
+
+    switch (triggerType) {
+      case 'scroll_depth':
+        if (!newConfig.scrollPercent) {
+          newConfig = { scrollPercent: 50 };
+        }
+        break;
+      case 'time_on_page':
+        if (!newConfig.seconds) {
+          newConfig = { seconds: 30 };
+        }
+        break;
+      case 'user_hesitation':
+        if (!newConfig.hesitationSeconds) {
+          newConfig = { hesitationSeconds: 3 };
+        }
+        break;
+      case 'bottom_proximity':
+        if (!newConfig.scrollPercent) {
+          newConfig = { scrollPercent: 80 };
+        }
+        break;
+    }
+
+    automationForm.setValue('triggerConfig', newConfig);
+  }, [triggerType, showAutomationDialog, automationForm]);
+
+  // Open automation dialog for creating or editing
+  const openAutomationDialog = (automation?: any) => {
+    if (automation) {
+      setEditingAutomation(automation);
+      
+      // Merge stored config with trigger type defaults to ensure required fields exist
+      const existingConfig = automation.triggerConfig || {};
+      let mergedConfig = { ...existingConfig };
+      
+      switch (automation.triggerType) {
+        case 'scroll_depth':
+          mergedConfig = { scrollPercent: 50, ...existingConfig };
+          break;
+        case 'time_on_page':
+          mergedConfig = { seconds: 30, ...existingConfig };
+          break;
+        case 'user_hesitation':
+          mergedConfig = { hesitationSeconds: 3, ...existingConfig };
+          break;
+        case 'bottom_proximity':
+          mergedConfig = { scrollPercent: 80, ...existingConfig };
+          break;
+      }
+      
+      automationForm.reset({
+        pageId: automation.pageId,
+        name: automation.name,
+        triggerType: automation.triggerType,
+        offerId: automation.offerId || undefined,
+        overlayTemplate: automation.overlayTemplate || 'popup',
+        triggerConfig: mergedConfig,
+      });
+    } else {
+      setEditingAutomation(null);
+      automationForm.reset({
+        pageId: selectedPageId || '',
+        name: '',
+        triggerType: 'scroll_depth',
+        offerId: undefined,
+        overlayTemplate: 'popup',
+        triggerConfig: {
+          scrollPercent: 50,
+        },
+      });
+    }
+    setShowAutomationDialog(true);
+  };
+
+  const onSubmitAutomation = (data: AutomationFormData) => {
+    if (editingAutomation) {
+      updateAutomationMutation.mutate({ id: editingAutomation.id, data });
+    } else {
+      createAutomationMutation.mutate({ ...data, pageId: selectedPageId! });
+    }
+    setShowAutomationDialog(false);
+    setEditingAutomation(null);
   };
   
   const handleSaveContent = () => {
@@ -762,11 +937,314 @@ export default function PageBuilderPage() {
               </TabsContent>
 
               <TabsContent value="automations" className="mt-6">
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-2">Behavior Automations</p>
-                  <p className="text-sm text-muted-foreground">
-                    Coming soon: Create scroll-depth, time-based, and exit-intent overlays to maximize conversions.
-                  </p>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-lg">Behavior Automations</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Trigger offers based on visitor behavior
+                    </p>
+                  </div>
+                  <Dialog open={showAutomationDialog} onOpenChange={setShowAutomationDialog}>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => openAutomationDialog()} data-testid="button-create-automation">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Automation
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingAutomation ? 'Edit Automation' : 'Create Automation'}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Set up behavioral triggers to show offers at the perfect moment
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...automationForm}>
+                        <form onSubmit={automationForm.handleSubmit(onSubmitAutomation)} className="space-y-4">
+                          <FormField
+                            control={automationForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Automation Name</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="e.g., 50% Scroll Newsletter Offer"
+                                    data-testid="input-automation-name"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={automationForm.control}
+                            name="triggerType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Trigger Type</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-trigger-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="scroll_depth">Scroll Depth</SelectItem>
+                                    <SelectItem value="time_on_page">Time on Page</SelectItem>
+                                    <SelectItem value="user_hesitation">User Hesitation</SelectItem>
+                                    <SelectItem value="bottom_proximity">Bottom Proximity</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={automationForm.control}
+                            name="offerId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Target Offer</FormLabel>
+                                <Select
+                                  value={field.value ?? NONE_VALUE}
+                                  onValueChange={(val) => field.onChange(val === NONE_VALUE ? undefined : val)}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-offer">
+                                      <SelectValue placeholder="No linked offer" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value={NONE_VALUE}>No linked offer</SelectItem>
+                                    {offers.map((offer: any) => (
+                                      <SelectItem key={offer.id} value={offer.id}>
+                                        {offer.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={automationForm.control}
+                            name="overlayTemplate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Display Style</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-overlay-template">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="popup">Popup</SelectItem>
+                                    <SelectItem value="slide_in">Slide In</SelectItem>
+                                    <SelectItem value="banner">Banner</SelectItem>
+                                    <SelectItem value="toast">Toast</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Scroll depth config */}
+                          {triggerType === 'scroll_depth' && (
+                            <FormField
+                              control={automationForm.control}
+                              name="triggerConfig.scrollPercent"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Scroll Percentage (%)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      {...field}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      data-testid="input-scroll-percent"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {/* Time on page config */}
+                          {triggerType === 'time_on_page' && (
+                            <FormField
+                              control={automationForm.control}
+                              name="triggerConfig.seconds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Seconds on Page</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      {...field}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      data-testid="input-seconds"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {/* User hesitation config */}
+                          {triggerType === 'user_hesitation' && (
+                            <FormField
+                              control={automationForm.control}
+                              name="triggerConfig.hesitationSeconds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Hesitation Duration (seconds)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      placeholder="3"
+                                      {...field}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      data-testid="input-hesitation-seconds"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {/* Bottom proximity config */}
+                          {triggerType === 'bottom_proximity' && (
+                            <FormField
+                              control={automationForm.control}
+                              name="triggerConfig.scrollPercent"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Scroll Threshold (%)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      placeholder="80"
+                                      {...field}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      data-testid="input-bottom-scroll-percent"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          <div className="flex gap-2 pt-4">
+                            <Button type="submit" data-testid="button-submit-automation">
+                              {editingAutomation ? 'Update' : 'Create'} Automation
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowAutomationDialog(false)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="space-y-3">
+                  {automations.map((automation: any, index: number) => {
+                    const targetOffer = offers.find((o: any) => o.id === automation.offerId);
+                    const getTriggerIcon = () => {
+                      switch (automation.triggerType) {
+                        case 'scroll_depth': return <ArrowDown className="h-4 w-4" />;
+                        case 'time_on_page': return <Clock className="h-4 w-4" />;
+                        case 'user_hesitation': return <MousePointer className="h-4 w-4" />;
+                        case 'bottom_proximity': return <ArrowDown className="h-4 w-4" />;
+                        default: return <Zap className="h-4 w-4" />;
+                      }
+                    };
+                    const getTriggerLabel = () => {
+                      const config = automation.triggerConfig || {};
+                      switch (automation.triggerType) {
+                        case 'scroll_depth':
+                          return `${config.scrollPercent || 50}% scroll`;
+                        case 'time_on_page':
+                          return `${config.seconds || 30}s on page`;
+                        case 'user_hesitation':
+                          return `${config.hesitationSeconds || 3}s pause`;
+                        case 'bottom_proximity':
+                          return `${config.scrollPercent || 80}% near bottom`;
+                        default:
+                          return automation.triggerType;
+                      }
+                    };
+
+                    return (
+                      <Card key={automation.id} className="p-4" data-testid={`card-automation-${index}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className="mt-1">
+                              {getTriggerIcon()}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold" data-testid={`text-automation-trigger-${index}`}>
+                                  {getTriggerLabel()}
+                                </h4>
+                                <Badge variant="outline">{automation.triggerType}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                Shows: <span className="font-medium">{targetOffer?.title || 'Unknown offer'}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openAutomationDialog(automation)}
+                              data-testid={`button-edit-automation-${index}`}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteAutomationMutation.mutate(automation.id)}
+                              data-testid={`button-delete-automation-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  {automations.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-12">
+                      No automations yet. Create your first one to start using behavioral triggers!
+                    </p>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

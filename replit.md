@@ -211,3 +211,49 @@ Preferred communication style: Simple, everyday language.
   - Click handler uses `closest()` for nested elements (SVG/span in buttons)
   - Explicit expanded/collapsed class management for correct 300x400px sizing
   - Added cardId validation in feedback flow to prevent undefined payloads
+
+**Phase 8 - Offer Deck & Automation Management** (Completed - Nov 15, 2025):
+- Transformed persistent panel into behavior-driven "Offer Deck" with swipeable card carousel
+- **OfferDeck Features**:
+  - Swipeable card carousel (embla-carousel) displaying up to 5 offers
+  - Category filtering pills (Shopping, Food, Travel, SaaS, etc.)
+  - Smart Pick offer always visible regardless of category filter
+  - Glass-morphism design with purple/blue gradients
+  - Product cards show icon, title, price, description, CTA
+  - Analytics tracking for category selections and card interactions
+- **Behavioral Automation System**:
+  - Added 4 trigger types: scroll_depth, time_on_page, user_hesitation, bottom_proximity
+  - All triggers respect creator-configured thresholds from database
+  - `useMousePauseDuration` hook tracks actual mouse pause duration
+  - Race prevention with `panelClaimedRef` ensures only first qualifying automation claims panel
+  - Panel starts collapsed, only surfaces when automations trigger (not immediately on load)
+- **Automation Management UI** (Page Builder):
+  - Full CRUD interface in "Automations" tab
+  - Dialog-based form with conditional inputs based on trigger type
+  - Sentinel value approach for optional offerId ("__none__" converts to undefined)
+  - Trigger config defaults auto-populate when switching trigger types
+  - Form validation using automationFormSchema with zodResolver
+  - Card-based list showing trigger details, target offers, edit/delete buttons
+- **Schema Updates**:
+  - Added `hesitationSeconds` to triggerConfigSchema
+  - All trigger types support creator-configured thresholds:
+    - scroll_depth → scrollPercent (e.g., 50%)
+    - time_on_page → seconds (e.g., 30s)
+    - user_hesitation → hesitationSeconds (e.g., 3s)
+    - bottom_proximity → scrollPercent (e.g., 80%)
+  - Added new event types: category_selected, panel_close, user_hesitation, bottom_proximity
+- **Technical Implementation**:
+  - useEffect watches triggerType and sets appropriate config defaults
+  - Automation evaluation respects all configured thresholds (no hardcoded values)
+  - Smart Pick filtering ensures routed offer always appears in deck
+  - Proper dependency management prevents stale closure bugs
+  - TanStack Query integration with cache invalidation for automations
+- **End-to-End Flow**:
+  1. Creator opens page builder → Automations tab → Creates automation
+  2. Configures trigger (e.g., "Newsletter Offer", user_hesitation, 5s pause, popup)
+  3. Automation persists to database with all configured values
+  4. Visitor lands on page → Panel starts collapsed
+  5. Visitor pauses mouse for 5s → Automation triggers → Panel expands
+  6. OfferDeck displays with newsletter offer as Smart Pick
+  7. Visitor can filter by category, Smart Pick stays visible
+  8. Click tracking and analytics captured in database
