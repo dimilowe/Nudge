@@ -134,7 +134,7 @@ export default function PageBuilderPage() {
   // Update offer mutation
   const updateOfferMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<OfferFormData> }) => {
-      return await apiRequest('PATCH', `/api/offers/${id}`, data);
+      return await apiRequest('PUT', `/api/offers/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
