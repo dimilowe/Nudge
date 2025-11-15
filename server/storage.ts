@@ -30,7 +30,7 @@ import {
   visitorEvents,
   offerPerformance,
 } from "@shared/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
 export interface OfferAnalytics {
   offerId: string;
@@ -349,7 +349,7 @@ export class DbStorage implements IStorage {
     return await db
       .select()
       .from(visitorEvents)
-      .where(sql`${visitorEvents.sessionId} = ANY(${sessionIds})`)
+      .where(inArray(visitorEvents.sessionId, sessionIds))
       .orderBy(desc(visitorEvents.timestamp))
       .limit(limit);
   }
@@ -389,7 +389,7 @@ export class DbStorage implements IStorage {
       ? await db
           .select()
           .from(visitorEvents)
-          .where(sql`${visitorEvents.sessionId} = ANY(${sessionIds})`)
+          .where(inArray(visitorEvents.sessionId, sessionIds))
       : [];
 
     const trafficSourceCounts = new Map<string, number>();

@@ -229,7 +229,7 @@ export const sessionStartSchema = z.object({
 
 export const eventTrackSchema = z.object({
   sessionId: z.string(),
-  eventType: z.enum(["page_view", "scroll", "click", "exit_intent", "automation_triggered", "offer_view", "offer_click", "category_selected", "panel_close", "user_hesitation", "bottom_proximity"]),
+  eventType: z.enum(["page_view", "scroll", "click", "exit_intent", "automation_triggered", "offer_view", "offer_click", "card_view_start", "card_view_end", "card_swipe", "category_selected", "panel_open", "panel_close", "user_hesitation", "bottom_proximity"]),
   meta: z.record(z.any()).optional(),
 });
 
