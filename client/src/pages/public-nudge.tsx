@@ -160,8 +160,10 @@ export default function PublicNudgePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [overlayOffer, setOverlayOffer] = useState<any>(null);
-  const [showFloatingPanel, setShowFloatingPanel] = useState(false);
+  const [panelOffer, setPanelOffer] = useState<any>(null);
   const [floatingPanelCollapsed, setFloatingPanelCollapsed] = useState(true);
+  const [triggeredAutomations, setTriggeredAutomations] = useState<Set<string>>(new Set());
+  const panelClaimedRef = useRef(false); // Prevents race condition in automation loop
   const scrollDepth = useScrollTracking(sessionId);
   const timeOnPage = useTimeTracking(sessionId);
 
@@ -239,55 +241,68 @@ export default function PublicNudgePage() {
     });
   }, [slug, sessionId]);
 
-  // Track offer view when offer loads
+  // Track offer view when panel displays an offer
   useEffect(() => {
-    if (offer && sessionId) {
+    if (panelOffer && sessionId) {
       trackEventMutation.mutate({
         sessionId,
         eventType: 'offer_view',
-        meta: { offerId: offer.id },
+        meta: { offerId: panelOffer.id, source: 'panel' },
       });
-      
-      // Show floating panel with smart-routed offer
-      setShowFloatingPanel(true);
-      setFloatingPanelCollapsed(false); // Auto-expand when offer appears
     }
-  }, [offer?.id, sessionId]);
+  }, [panelOffer?.id, sessionId]);
 
-  // Check automations based on behavior
+  // Reset panel claim when offer is cleared
+  useEffect(() => {
+    if (!panelOffer) {
+      panelClaimedRef.current = false;
+    }
+  }, [panelOffer]);
+
+  // Check automations based on behavior (with race prevention)
   useEffect(() => {
     if (!automations || automations.length === 0 || !sessionId) return;
+    if (panelClaimedRef.current) return; // Panel already claimed this cycle
 
-    automations.forEach((automation: any) => {
+    for (const automation of automations) {
+      // Skip if already triggered
+      if (triggeredAutomations.has(automation.id)) continue;
+
       const config = automation.triggerConfig;
+      let shouldTrigger = false;
 
       // Scroll-depth trigger
       if (automation.triggerType === 'scroll_depth' && config.scrollPercent) {
-        if (scrollDepth >= config.scrollPercent && !showOverlay) {
-          setOverlayOffer(automation);
-          setShowOverlay(true);
-          trackEventMutation.mutate({
-            sessionId,
-            eventType: 'automation_triggered',
-            meta: { automationId: automation.id, trigger: 'scroll_depth' },
-          });
-        }
+        shouldTrigger = scrollDepth >= config.scrollPercent;
       }
 
       // Time-based trigger
       if (automation.triggerType === 'time_on_page' && config.seconds) {
-        if (timeOnPage >= config.seconds && !showOverlay) {
-          setOverlayOffer(automation);
-          setShowOverlay(true);
+        shouldTrigger = timeOnPage >= config.seconds;
+      }
+
+      // If this automation should trigger, claim the panel immediately
+      if (shouldTrigger) {
+        const targetOffer = offers.find((o: any) => o.id === automation.offerId);
+        if (targetOffer) {
+          panelClaimedRef.current = true; // Claim panel NOW to prevent others
+          setPanelOffer(targetOffer);
+          setFloatingPanelCollapsed(false);
+          setTriggeredAutomations(prev => new Set([...Array.from(prev), automation.id]));
           trackEventMutation.mutate({
             sessionId,
             eventType: 'automation_triggered',
-            meta: { automationId: automation.id, trigger: 'time_on_page' },
+            meta: { 
+              automationId: automation.id, 
+              trigger: automation.triggerType,
+              offerId: targetOffer.id 
+            },
           });
+          break; // Stop checking other automations
         }
       }
-    });
-  }, [scrollDepth, timeOnPage, automations, sessionId, showOverlay]);
+    }
+  }, [scrollDepth, timeOnPage, automations, sessionId, triggeredAutomations, offers]);
 
   // Track offer click
   const handleOfferClick = (clickedOffer: any) => {
@@ -462,41 +477,59 @@ export default function PublicNudgePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Overlay Panel (glass-morphism style) */}
-      {showFloatingPanel && offer && (
+      {/* Floating Overlay Panel (glass-morphism style) - Always present if automations exist */}
+      {(automations.length > 0 || offers.length > 0) && (
         <OverlayPanel
           isCollapsed={floatingPanelCollapsed}
           onCollapsedChange={setFloatingPanelCollapsed}
-          onClose={() => setShowFloatingPanel(false)}
-          title="Smart Pick For You"
+          onClose={() => {
+            setPanelOffer(null);
+            setFloatingPanelCollapsed(true);
+            if (sessionId) {
+              trackEventMutation.mutate({
+                sessionId,
+                eventType: 'panel_close',
+                meta: { offerId: panelOffer?.id },
+              });
+            }
+          }}
+          title={panelOffer ? "Smart Pick For You" : "Nudge"}
         >
-          <div className="space-y-4">
-            {/* Offer Card in Panel */}
-            <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-lg border border-white/20">
-              <div className="flex items-start gap-2 mb-2">
-                <span className="text-xl">⭐</span>
-                <div className="flex-1">
-                  <h3 className="font-bold text-sm mb-1">{offer.title}</h3>
-                  {offer.description && (
-                    <p className="text-xs opacity-80 line-clamp-2 mb-3">{offer.description}</p>
-                  )}
-                  <Button
-                    size="sm"
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                    onClick={() => handleOfferClick(offer)}
-                    data-testid="button-floating-offer"
-                  >
-                    {offer.cta || 'Check it out'} →
-                  </Button>
+          {panelOffer ? (
+            <div className="space-y-4">
+              {/* Offer Card in Panel */}
+              <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-lg border border-white/20">
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="text-xl">⭐</span>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-sm mb-1">{panelOffer.title}</h3>
+                    {panelOffer.description && (
+                      <p className="text-xs opacity-80 line-clamp-2 mb-3">{panelOffer.description}</p>
+                    )}
+                    <Button
+                      size="sm"
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                      onClick={() => handleOfferClick(panelOffer)}
+                      data-testid="button-floating-offer"
+                    >
+                      {panelOffer.cta || 'Check it out'} →
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Info Text */}
-            <div className="text-xs opacity-60 text-center px-2">
-              <p>💡 This offer was specially selected based on your profile</p>
+              {/* Info Text */}
+              <div className="text-xs opacity-60 text-center px-2">
+                <p>💡 This offer was specially selected for you</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-6 px-4">
+              <div className="text-4xl mb-3">✨</div>
+              <p className="text-sm opacity-80 mb-1">Browse around!</p>
+              <p className="text-xs opacity-60">We'll surface picks as you explore</p>
+            </div>
+          )}
         </OverlayPanel>
       )}
     </div>
