@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRoute } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -132,34 +132,44 @@ function OfferDeck({
   trackEvent: (event: any) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [emblaRef] = useEmblaCarousel({ 
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
     loop: false, 
     align: 'start',
     slidesToScroll: 1,
   });
+  const viewTimersRef = useRef<Map<string, number>>(new Map());
+  const lastSwipeIndexRef = useRef<number>(-1);
+  const prevFilteredOfferIdsRef = useRef<Set<string>>(new Set());
+  const currentVisibleOfferIdRef = useRef<string | null>(null);
+  const lastSettledOfferIdRef = useRef<string | null>(null);
 
-  const activeOffers = offers
-    .filter((o: any) => o.isActive)
-    .sort((a: any, b: any) => {
-      // Selected offer goes first
-      if (selectedOffer && a.id === selectedOffer.id) return -1;
-      if (selectedOffer && b.id === selectedOffer.id) return 1;
-      return (a.displayOrder || 0) - (b.displayOrder || 0);
-    });
+  const activeOffers = useMemo(() => {
+    return offers
+      .filter((o: any) => o.isActive)
+      .sort((a: any, b: any) => {
+        // Selected offer goes first
+        if (selectedOffer && a.id === selectedOffer.id) return -1;
+        if (selectedOffer && b.id === selectedOffer.id) return 1;
+        return (a.displayOrder || 0) - (b.displayOrder || 0);
+      });
+  }, [offers, selectedOffer]);
 
   // Get unique categories
   const categories = Array.from(new Set(activeOffers.map((o: any) => o.type)));
   
   // Filter by category if selected (show all when no category selected)
   // Always include the Smart Pick offer even if it doesn't match the selected category
-  const filteredOffers = !selectedCategory
-    ? activeOffers
-    : activeOffers.filter((o: any) => {
-        // Always show the selected offer (Smart Pick)
-        if (selectedOffer && o.id === selectedOffer.id) return true;
-        // Otherwise filter by category
-        return o.type === selectedCategory;
-      });
+  // Memoize to prevent observer effect from re-running on every render
+  const filteredOffers = useMemo(() => {
+    return !selectedCategory
+      ? activeOffers
+      : activeOffers.filter((o: any) => {
+          // Always show the selected offer (Smart Pick)
+          if (selectedOffer && o.id === selectedOffer.id) return true;
+          // Otherwise filter by category
+          return o.type === selectedCategory;
+        });
+  }, [activeOffers, selectedCategory, selectedOffer]);
 
   // Track category selection
   const handleCategorySelect = (category: string | null) => {
@@ -172,6 +182,172 @@ function OfferDeck({
       });
     }
   };
+
+  // Initialize lastSettledOfferIdRef when carousel mounts
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    const selectedIndex = emblaApi.selectedScrollSnap();
+    const initialOffer = filteredOffers[selectedIndex];
+    if (initialOffer) {
+      lastSettledOfferIdRef.current = initialOffer.id;
+      lastSwipeIndexRef.current = selectedIndex;
+    }
+  }, [emblaApi, filteredOffers]);
+
+  // Initialize prevFilteredOfferIdsRef on mount
+  useEffect(() => {
+    prevFilteredOfferIdsRef.current = new Set(filteredOffers.map((o: any) => o.id));
+  }, []);
+
+  // Flush timers for offers that are removed from filteredOffers (e.g., category change)
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const currentOfferIds = new Set(filteredOffers.map((o: any) => o.id));
+    const prevOfferIds = prevFilteredOfferIdsRef.current;
+
+    // Find offers that were removed
+    const removedOfferIds = Array.from(prevOfferIds).filter(id => !currentOfferIds.has(id));
+
+    // Flush timers for removed offers
+    removedOfferIds.forEach(offerId => {
+      if (viewTimersRef.current.has(offerId)) {
+        const startTime = viewTimersRef.current.get(offerId);
+        if (startTime) {
+          const duration = Date.now() - startTime;
+          trackEvent({
+            sessionId,
+            eventType: 'card_view_end',
+            meta: { offerId, duration },
+          });
+        }
+        viewTimersRef.current.delete(offerId);
+      }
+    });
+
+    // Update the previous set for next comparison
+    prevFilteredOfferIdsRef.current = currentOfferIds;
+  }, [filteredOffers, sessionId, trackEvent]);
+
+  // Track card swipes using Embla API (only fire once per index change)
+  useEffect(() => {
+    if (!emblaApi || !sessionId) return;
+
+    const onSelect = () => {
+      const selectedIndex = emblaApi.selectedScrollSnap();
+      
+      // Only fire if the index actually changed
+      if (selectedIndex === lastSwipeIndexRef.current) return;
+      
+      // Flush timer for the card that was settled on carousel BEFORE this swipe
+      // This is the authoritative cleanup - happens regardless of observer timing
+      if (lastSettledOfferIdRef.current && viewTimersRef.current.has(lastSettledOfferIdRef.current)) {
+        const startTime = viewTimersRef.current.get(lastSettledOfferIdRef.current);
+        if (startTime) {
+          const duration = Date.now() - startTime;
+          trackEvent({
+            sessionId,
+            eventType: 'card_view_end',
+            meta: { offerId: lastSettledOfferIdRef.current, duration },
+          });
+          viewTimersRef.current.delete(lastSettledOfferIdRef.current);
+        }
+      }
+      
+      const offer = filteredOffers[selectedIndex];
+      if (offer) {
+        trackEvent({
+          sessionId,
+          eventType: 'card_swipe',
+          meta: { 
+            offerId: offer.id,
+            cardIndex: selectedIndex,
+            direction: selectedIndex > lastSwipeIndexRef.current ? 'next' : 'prev'
+          },
+        });
+        lastSwipeIndexRef.current = selectedIndex;
+        lastSettledOfferIdRef.current = offer.id; // Track which offer carousel settled on
+      }
+    };
+
+    // Use 'select' event instead of 'scroll' - fires only when carousel settles on new index
+    emblaApi.on('select', onSelect);
+    return () => {
+      emblaApi.off('select', onSelect);
+    };
+  }, [emblaApi, sessionId, filteredOffers, trackEvent]);
+
+  // Track card views using Intersection Observer
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const offerId = entry.target.getAttribute('data-offer-id');
+          if (!offerId) return;
+
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            // Card came into view (>50% visible)
+            if (!viewTimersRef.current.has(offerId)) {
+              trackEvent({
+                sessionId,
+                eventType: 'card_view_start',
+                meta: { offerId },
+              });
+              
+              // Start timer and update visible card tracking
+              viewTimersRef.current.set(offerId, Date.now());
+              currentVisibleOfferIdRef.current = offerId;
+            }
+          } else if (viewTimersRef.current.has(offerId)) {
+            // Card left view OR dropped below 50% - calculate duration
+            // This handles both complete exit and partial visibility (e.g., carousel swipe)
+            const startTime = viewTimersRef.current.get(offerId);
+            if (startTime) {
+              const duration = Date.now() - startTime;
+              trackEvent({
+                sessionId,
+                eventType: 'card_view_end',
+                meta: { offerId, duration },
+              });
+              viewTimersRef.current.delete(offerId);
+            }
+          }
+        });
+      },
+      {
+        threshold: [0, 0.5, 1],
+        root: null,
+      }
+    );
+
+    // Observe all card elements
+    const cardElements = document.querySelectorAll('[data-offer-id]');
+    cardElements.forEach(el => observer.observe(el));
+
+    // Don't flush timers on effect cleanup - only disconnect observer
+    return () => observer.disconnect();
+  }, [sessionId, filteredOffers, trackEvent]);
+
+  // Flush all remaining timers only on component unmount
+  useEffect(() => {
+    return () => {
+      // If there are any timers, flush them (sessionId must be valid if timers exist)
+      if (viewTimersRef.current.size > 0 && sessionId) {
+        viewTimersRef.current.forEach((startTime, offerId) => {
+          const duration = Date.now() - startTime;
+          trackEvent({
+            sessionId,
+            eventType: 'card_view_end',
+            meta: { offerId, duration },
+          });
+        });
+        viewTimersRef.current.clear();
+      }
+    };
+  }, [sessionId, trackEvent]);
 
   if (!selectedOffer && filteredOffers.length === 0) {
     return (
@@ -219,10 +395,12 @@ function OfferDeck({
       {/* Swipeable Offer Cards */}
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex gap-3">
-          {filteredOffers.slice(0, 5).map((offer: any) => (
+          {filteredOffers.slice(0, 5).map((offer: any, index: number) => (
             <div
               key={offer.id}
               className="flex-[0_0_100%] min-w-0"
+              data-offer-id={offer.id}
+              data-card-index={index}
             >
               <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
                 <div className="flex items-start gap-3 mb-3">

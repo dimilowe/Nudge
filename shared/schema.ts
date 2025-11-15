@@ -101,8 +101,8 @@ export const visitorSessions = pgTable("visitor_sessions", {
 export const visitorEvents = pgTable("visitor_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sessionId: varchar("session_id").notNull(),
-  eventType: text("event_type").notNull(), // 'page_view' | 'scroll' | 'click' | 'exit_intent' | 'automation_triggered' | 'offer_view' | 'offer_click'
-  meta: jsonb("meta"), // { scrollDepth?: number, offerId?: string, automationId?: string, href?: string }
+  eventType: text("event_type").notNull(), // 'page_view' | 'scroll' | 'click' | 'exit_intent' | 'automation_triggered' | 'offer_view' | 'offer_click' | 'card_view_start' | 'card_view_end' | 'card_swipe' | 'category_selected' | 'panel_open' | 'panel_close'
+  meta: jsonb("meta"), // { scrollDepth?: number, offerId?: string, automationId?: string, href?: string, duration?: number, cardIndex?: number, direction?: string, category?: string }
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 

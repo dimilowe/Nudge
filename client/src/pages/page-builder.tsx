@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown, BarChart3, Eye, TrendingUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -146,6 +146,17 @@ export default function PageBuilderPage() {
   });
 
   const automations = automationsData?.automations || [];
+
+  // Fetch offer analytics for selected page
+  const { data: offerAnalytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['/api/analytics/offers', selectedPageId],
+    queryFn: async () => {
+      if (!selectedPageId) return null;
+      const res = await fetch(`/api/analytics/offers/${selectedPageId}`);
+      return res.json();
+    },
+    enabled: !!selectedPageId,
+  });
 
   // Create automation mutation
   const createAutomationMutation = useMutation({
@@ -549,6 +560,7 @@ export default function PageBuilderPage() {
                 <TabsTrigger value="offers" data-testid="tab-offers">Offers</TabsTrigger>
                 <TabsTrigger value="rules" data-testid="tab-rules">Routing Rules</TabsTrigger>
                 <TabsTrigger value="automations" data-testid="tab-automations">Automations</TabsTrigger>
+                <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
               </TabsList>
 
               <TabsContent value="content" className="mt-6">
@@ -1244,6 +1256,114 @@ export default function PageBuilderPage() {
                     <p className="text-sm text-muted-foreground text-center py-12">
                       No automations yet. Create your first one to start using behavioral triggers!
                     </p>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="analytics" className="mt-6">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-semibold text-lg mb-1">Offer Performance</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Track which offers get the most views, clicks, and engagement
+                    </p>
+                  </div>
+
+                  {analyticsLoading ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">Loading analytics...</p>
+                    </div>
+                  ) : offerAnalytics?.offers && offerAnalytics.offers.length > 0 ? (
+                    <>
+                      {/* Summary Cards */}
+                      <div className="grid gap-4 md:grid-cols-3 mb-6">
+                        <Card className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Total Sessions</p>
+                              <p className="text-2xl font-bold mt-1">{offerAnalytics.totalSessions}</p>
+                            </div>
+                            <Eye className="h-8 w-8 text-muted-foreground opacity-50" />
+                          </div>
+                        </Card>
+                        <Card className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Total Views</p>
+                              <p className="text-2xl font-bold mt-1">
+                                {offerAnalytics.offers.reduce((sum: number, o: any) => sum + o.views, 0)}
+                              </p>
+                            </div>
+                            <BarChart3 className="h-8 w-8 text-muted-foreground opacity-50" />
+                          </div>
+                        </Card>
+                        <Card className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Total Clicks</p>
+                              <p className="text-2xl font-bold mt-1">
+                                {offerAnalytics.offers.reduce((sum: number, o: any) => sum + o.clicks, 0)}
+                              </p>
+                            </div>
+                            <TrendingUp className="h-8 w-8 text-muted-foreground opacity-50" />
+                          </div>
+                        </Card>
+                      </div>
+
+                      {/* Offer Performance Table */}
+                      <div className="space-y-3">
+                        {offerAnalytics.offers.map((offer: any, index: number) => (
+                          <Card key={offer.offerId} className="p-4" data-testid={`card-offer-analytics-${index}`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold">{offer.title}</h4>
+                                  <Badge variant="outline">{offer.type}</Badge>
+                                  {offer.neverTouched && (
+                                    <Badge variant="destructive" className="text-xs">Never Viewed</Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Views</p>
+                                    <p className="font-bold text-lg">{offer.views}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Clicks</p>
+                                    <p className="font-bold text-lg">{offer.clicks}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">CTR</p>
+                                    <p className="font-bold text-lg">{offer.ctr}%</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Avg View Time</p>
+                                    <p className="font-bold text-lg">{offer.avgViewDuration}s</p>
+                                  </div>
+                                </div>
+                                
+                                {offer.swipes > 0 && (
+                                  <div className="mt-2 pt-2 border-t">
+                                    <p className="text-xs text-muted-foreground">
+                                      Swiped {offer.swipes} times
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-12">
+                      <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground opacity-30 mb-3" />
+                      <p className="text-muted-foreground mb-2">No analytics data yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Visit your public page to start collecting data
+                      </p>
+                    </div>
                   )}
                 </div>
               </TabsContent>

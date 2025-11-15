@@ -530,6 +530,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== OFFER PERFORMANCE ANALYTICS =====
+  
+  // GET /api/analytics/offers/:pageId - Get offer performance metrics
+  app.get("/api/analytics/offers/:pageId", async (req, res) => {
+    try {
+      const { pageId } = req.params;
+      
+      // Get all offers for this page
+      const offers = await storage.getOffersByPageId(pageId);
+      
+      // Get all sessions for this page
+      const sessions = await storage.getSessionsByPageId(pageId);
+      
+      // Get all events in one bulk query (much faster than iterating sessions)
+      const allEvents = await storage.getEventsByPageId(pageId);
+      
+      // Calculate performance metrics for each offer
+      const offerMetrics = offers.map(offer => {
+        const cardViewStarts = allEvents.filter(
+          e => e.eventType === 'card_view_start' && (e.meta as any)?.offerId === offer.id
+        );
+        const cardViewEnds = allEvents.filter(
+          e => e.eventType === 'card_view_end' && (e.meta as any)?.offerId === offer.id
+        );
+        const clicks = allEvents.filter(
+          e => e.eventType === 'offer_click' && (e.meta as any)?.offerId === offer.id
+        );
+        const swipes = allEvents.filter(
+          e => e.eventType === 'card_swipe' && (e.meta as any)?.offerId === offer.id
+        );
+        
+        // Calculate average view duration (only count valid durations from paired events)
+        const validDurations = cardViewEnds
+          .map(e => (e.meta as any)?.duration)
+          .filter(d => typeof d === 'number' && d > 0);
+        const avgViewDuration = validDurations.length > 0
+          ? validDurations.reduce((sum, d) => sum + d, 0) / validDurations.length
+          : 0;
+        
+        const views = cardViewStarts.length;
+        const clickCount = clicks.length;
+        const ctr = views > 0 ? (clickCount / views) * 100 : 0;
+        const swipeCount = swipes.length;
+        
+        return {
+          offerId: offer.id,
+          title: offer.title,
+          type: offer.type,
+          views,
+          clicks: clickCount,
+          ctr: Math.round(ctr * 10) / 10, // Round to 1 decimal
+          avgViewDuration: Math.round(avgViewDuration / 1000), // Convert to seconds
+          swipes: swipeCount,
+          neverTouched: views === 0,
+        };
+      });
+      
+      // Sort by views descending
+      offerMetrics.sort((a, b) => b.views - a.views);
+      
+      return res.json({
+        offers: offerMetrics,
+        totalSessions: sessions.length,
+      });
+    } catch (error) {
+      console.error("Offer analytics error:", error);
+      return res.status(500).json({ error: "Failed to fetch offer analytics" });
+    }
+  });
+
   // ===== SMART ROUTING ENGINE =====
   
   // POST /api/route - Get the best offer for this visitor
