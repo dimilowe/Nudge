@@ -1,8 +1,12 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { creators } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import {
   sessionStartSchema,
   eventTrackSchema,
@@ -116,7 +120,47 @@ async function evaluateRoutingRules(pageId: string, session: any): Promise<strin
   return page?.defaultOfferId || null;
 }
 
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'uploads', 'images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Serve uploaded images statically
+  app.use('/uploads', (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
+    next();
+  });
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   
   // CORS middleware with security-conscious origin policy
   app.use((req, res, next) => {
@@ -153,6 +197,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     next();
+  });
+
+  // ===== FILE UPLOAD =====
+  
+  // POST /api/upload/image - Upload an image file
+  app.post("/api/upload/image", upload.single('image'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      // Return the URL path for the uploaded image
+      const imageUrl = `/uploads/images/${req.file.filename}`;
+      return res.json({ imageUrl });
+    } catch (error) {
+      console.error("Image upload error:", error);
+      return res.status(500).json({ error: "Failed to upload image" });
+    }
   });
 
   // ===== DEMO DATA =====

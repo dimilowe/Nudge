@@ -26,6 +26,7 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown, BarChart3, Eye, TrendingUp } from 'lucide-react';
+import { ImageUpload } from '@/components/ImageUpload';
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,8 @@ export default function PageBuilderPage() {
   const [contentCtaText, setContentCtaText] = useState('Get Started');
   const [contentCtaHref, setContentCtaHref] = useState('');
   const [contentBgStyle, setContentBgStyle] = useState('gradient');
+  const [heroImage, setHeroImage] = useState<string | undefined>(undefined);
+  const [backgroundImage, setBackgroundImage] = useState<string | undefined>(undefined);
 
   // Fetch demo data (creator + page)
   const { data: demoData } = useQuery({
@@ -244,6 +247,8 @@ export default function PageBuilderPage() {
         setContentCtaText(heroSection.ctaText || 'Get Started');
         setContentCtaHref(heroSection.ctaHref || '');
         setContentBgStyle(heroSection.backgroundColor || 'gradient');
+        setHeroImage(heroSection.heroImage);
+        setBackgroundImage(heroSection.backgroundImage);
       } else {
         // Reset to defaults for new pages
         setContentHeadline('Your Amazing Headline');
@@ -251,6 +256,8 @@ export default function PageBuilderPage() {
         setContentCtaText('Get Started');
         setContentCtaHref('');
         setContentBgStyle('gradient');
+        setHeroImage(undefined);
+        setBackgroundImage(undefined);
       }
     }
   }, [selectedPage]);
@@ -409,6 +416,8 @@ export default function PageBuilderPage() {
             ctaText: contentCtaText,
             ctaHref: contentCtaHref,
             backgroundColor: contentBgStyle,
+            heroImage: heroImage,
+            backgroundImage: backgroundImage,
           }
         ]
       }
@@ -630,6 +639,25 @@ export default function PageBuilderPage() {
                             </SelectContent>
                           </Select>
                         </div>
+                        
+                        {/* Hero Image Upload */}
+                        <ImageUpload
+                          label="Hero Image"
+                          value={heroImage}
+                          onChange={setHeroImage}
+                          aspectRatio="aspect-square"
+                        />
+                        
+                        {/* Background Image Upload - Only shown when image style is selected */}
+                        {contentBgStyle === 'image' && (
+                          <ImageUpload
+                            label="Background Image"
+                            value={backgroundImage}
+                            onChange={setBackgroundImage}
+                            aspectRatio="aspect-video"
+                          />
+                        )}
+                        
                         <Button 
                           onClick={handleSaveContent}
                           disabled={updateContentMutation.isPending}
@@ -642,16 +670,45 @@ export default function PageBuilderPage() {
                     </Card>
 
                     {/* Live Preview - Link-in-bio Style */}
-                    <Card className="p-0 bg-gradient-to-br from-purple-600 to-blue-600 text-white relative overflow-hidden border-purple-500">
-                      <div className="relative z-10 p-8 flex flex-col items-center text-center min-h-[500px]">
+                    <Card 
+                      className="p-0 text-white relative overflow-hidden border-purple-500"
+                      style={
+                        contentBgStyle === 'image' && backgroundImage && backgroundImage.trim()
+                          ? {
+                              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${backgroundImage})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }
+                          : undefined
+                      }
+                    >
+                      <div 
+                        className={`relative z-10 p-8 flex flex-col items-center text-center min-h-[500px] ${
+                          contentBgStyle === 'solid'
+                            ? 'bg-slate-900'
+                            : contentBgStyle === 'gradient'
+                            ? 'bg-gradient-to-br from-purple-600 to-blue-600'
+                            : contentBgStyle === 'image' && backgroundImage && backgroundImage.trim()
+                            ? ''
+                            : 'bg-gradient-to-br from-purple-600 to-blue-600'
+                        }`}
+                      >
                         <div className="text-xs font-semibold mb-6 opacity-75 uppercase tracking-wider">LIVE PREVIEW</div>
                         
                         {/* Hero Image Card */}
                         <div className="w-full max-w-md mb-8">
                           <div className="bg-white rounded-3xl p-8 shadow-2xl">
-                            <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
-                              <div className="text-6xl">📸</div>
-                            </div>
+                            {heroImage ? (
+                              <img 
+                                src={heroImage} 
+                                alt="Hero" 
+                                className="aspect-square w-full rounded-2xl object-cover"
+                              />
+                            ) : (
+                              <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
+                                <div className="text-6xl">📸</div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         

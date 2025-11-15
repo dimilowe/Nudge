@@ -761,6 +761,9 @@ export default function PublicNudgePage() {
   const heroSection = content?.sections?.[0];
   const headline = heroSection?.headline || page.title;
   const subheadline = heroSection?.subheadline || page.description || '';
+  const heroImage = heroSection?.heroImage;
+  const bgStyle = heroSection?.backgroundColor || 'gradient';
+  const backgroundImage = heroSection?.backgroundImage;
 
   // Get top 10 offers to display (prioritize routed offer first)
   const topOffers = [...offers]
@@ -774,15 +777,47 @@ export default function PublicNudgePage() {
     .filter((o: any) => o.isActive)
     .slice(0, 10);
 
+  // Check if background image is actually usable (not empty/whitespace/null)
+  const hasUsableBackgroundImage = backgroundImage && backgroundImage.trim().length > 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 text-white" data-testid="page-public-nudge">
+    <div 
+      className={`min-h-screen text-white ${
+        bgStyle === 'solid'
+          ? 'bg-slate-900'
+          : bgStyle === 'gradient'
+          ? 'bg-gradient-to-br from-purple-600 to-blue-600'
+          : bgStyle === 'image' && hasUsableBackgroundImage
+          ? ''
+          : 'bg-gradient-to-br from-purple-600 to-blue-600'
+      }`}
+      data-testid="page-public-nudge"
+      style={
+        bgStyle === 'image' && hasUsableBackgroundImage
+          ? {
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${backgroundImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+            }
+          : undefined
+      }
+    >
       <div className="container mx-auto px-4 py-12 max-w-2xl">
         {/* Hero Image Card */}
         <div className="mb-8">
           <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md mx-auto">
-            <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
-              <div className="text-6xl">📸</div>
-            </div>
+            {heroImage ? (
+              <img 
+                src={heroImage} 
+                alt="Hero" 
+                className="aspect-square w-full rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="aspect-square bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
+                <div className="text-6xl">📸</div>
+              </div>
+            )}
           </div>
         </div>
         
