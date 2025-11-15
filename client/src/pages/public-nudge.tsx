@@ -590,7 +590,8 @@ export default function PublicNudgePage() {
   // Create session mutation
   const createSessionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('/api/track/session', 'POST', data);
+      const res = await apiRequest('POST', '/api/track/session', data);
+      return res.json();
     },
     onSuccess: (data: any) => {
       setSessionId(data.sessionId);
@@ -600,7 +601,8 @@ export default function PublicNudgePage() {
   // Track event mutation
   const trackEventMutation = useMutation({
     mutationFn: async (event: any) => {
-      return await apiRequest('/api/track/event', 'POST', event);
+      const res = await apiRequest('POST', '/api/track/event', event);
+      return res.json();
     },
   });
 
