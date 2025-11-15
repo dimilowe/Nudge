@@ -47,6 +47,7 @@ export default function PageBuilderPage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [showNewPageForm, setShowNewPageForm] = useState(false);
   const [showNewOfferForm, setShowNewOfferForm] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<any | null>(null);
   const [showAutomationDialog, setShowAutomationDialog] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
   
@@ -58,6 +59,9 @@ export default function PageBuilderPage() {
   const [contentBgStyle, setContentBgStyle] = useState('gradient');
   const [heroImage, setHeroImage] = useState<string | undefined>(undefined);
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>(undefined);
+  
+  // Offer image state
+  const [offerImage, setOfferImage] = useState<string | undefined>(undefined);
 
   // Fetch demo data (creator + page)
   const { data: demoData } = useQuery({
@@ -119,10 +123,27 @@ export default function PageBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
       setShowNewOfferForm(false);
+      setOfferImage(undefined);
       toast({ title: 'Offer created successfully!' });
     },
     onError: () => {
       toast({ title: 'Failed to create offer', variant: 'destructive' });
+    },
+  });
+
+  // Update offer mutation
+  const updateOfferMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<OfferFormData> }) => {
+      return await apiRequest('PATCH', `/api/offers/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
+      setEditingOffer(null);
+      setOfferImage(undefined);
+      toast({ title: 'Offer updated successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update offer', variant: 'destructive' });
     },
   });
 
@@ -286,7 +307,51 @@ export default function PageBuilderPage() {
   };
 
   const onCreateOffer = (data: OfferFormData) => {
-    createOfferMutation.mutate({ ...data, pageId: selectedPageId! });
+    createOfferMutation.mutate({ ...data, pageId: selectedPageId!, imageUrl: offerImage });
+  };
+
+  const onUpdateOffer = (data: OfferFormData) => {
+    if (!editingOffer) return;
+    updateOfferMutation.mutate({ 
+      id: editingOffer.id, 
+      data: { ...data, imageUrl: offerImage } 
+    });
+  };
+
+  const handleEditOffer = (offer: any) => {
+    setEditingOffer(offer);
+    setOfferImage(offer.imageUrl);
+    offerForm.reset({
+      pageId: offer.pageId,
+      type: offer.type,
+      title: offer.title,
+      description: offer.description || '',
+      cta: offer.cta,
+      href: offer.href,
+      imageUrl: offer.imageUrl || '',
+      price: offer.price || undefined,
+      funnelStage: offer.funnelStage,
+      displayOrder: offer.displayOrder || 0,
+      isActive: offer.isActive,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingOffer(null);
+    setOfferImage(undefined);
+    offerForm.reset({
+      pageId: selectedPageId || '',
+      type: 'digital_product',
+      title: '',
+      description: '',
+      cta: '',
+      href: '',
+      imageUrl: '',
+      price: undefined,
+      funnelStage: 'entry',
+      displayOrder: 0,
+      isActive: true,
+    });
   };
 
   // Automation form
@@ -910,6 +975,15 @@ export default function PageBuilderPage() {
                             </FormItem>
                           )}
                         />
+                        
+                        {/* Offer Image Upload */}
+                        <ImageUpload
+                          label="Offer Image (Optional)"
+                          value={offerImage}
+                          onChange={setOfferImage}
+                          aspectRatio="aspect-square"
+                        />
+                        
                         <FormField
                           control={offerForm.control}
                           name="funnelStage"
@@ -952,6 +1026,127 @@ export default function PageBuilderPage() {
                   </Card>
                 )}
 
+                {/* Edit Offer Form */}
+                {editingOffer && (
+                  <Card className="p-4 mb-4 bg-muted border-primary">
+                    <h4 className="font-semibold mb-3">Edit Offer</h4>
+                    <Form {...offerForm}>
+                      <form onSubmit={offerForm.handleSubmit(onUpdateOffer)} className="space-y-3">
+                        <FormField
+                          control={offerForm.control}
+                          name="type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-edit-offer-type">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="freebie">Freebie</SelectItem>
+                                  <SelectItem value="digital_product">Digital Product</SelectItem>
+                                  <SelectItem value="coaching">Coaching</SelectItem>
+                                  <SelectItem value="bundle">Bundle</SelectItem>
+                                  <SelectItem value="affiliate">Affiliate</SelectItem>
+                                  <SelectItem value="custom">Custom</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={offerForm.control}
+                          name="title"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Title</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-offer-title" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={offerForm.control}
+                          name="cta"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Call to Action</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Get it now" data-testid="input-edit-offer-cta" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={offerForm.control}
+                          name="href"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Link</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="url" data-testid="input-edit-offer-href" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        {/* Offer Image Upload */}
+                        <ImageUpload
+                          label="Offer Image (Optional)"
+                          value={offerImage}
+                          onChange={setOfferImage}
+                          aspectRatio="aspect-square"
+                        />
+                        
+                        <FormField
+                          control={offerForm.control}
+                          name="funnelStage"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Funnel Stage</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-edit-funnel-stage">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="lead_capture">Lead Capture</SelectItem>
+                                  <SelectItem value="entry">Entry</SelectItem>
+                                  <SelectItem value="core">Core</SelectItem>
+                                  <SelectItem value="premium">Premium</SelectItem>
+                                  <SelectItem value="upsell">Upsell</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex gap-2">
+                          <Button type="submit" size="sm" data-testid="button-update-offer">
+                            Update Offer
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={handleCancelEdit}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </Card>
+                )}
+
                 <div className="space-y-3">
                   {offers.map((offer: any, index: number) => (
                     <Card key={offer.id} className="p-4" data-testid={`card-offer-${index}`}>
@@ -977,14 +1172,24 @@ export default function PageBuilderPage() {
                             </a>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteOfferMutation.mutate(offer.id)}
-                          data-testid={`button-delete-offer-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditOffer(offer)}
+                            data-testid={`button-edit-offer-${index}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteOfferMutation.mutate(offer.id)}
+                            data-testid={`button-delete-offer-${index}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   ))}
