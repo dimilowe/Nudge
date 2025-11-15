@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ExternalLink } from 'lucide-react';
 import type { NudgePageFormData, OfferFormData } from '@shared/schema';
 import { nudgePageFormSchema, offerFormSchema } from '@shared/schema';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -324,19 +324,38 @@ export default function PageBuilderPage() {
 
           <div className="space-y-3">
             {pages.map((page: any) => (
-              <button
+              <div
                 key={page.id}
-                onClick={() => setSelectedPageId(page.id)}
-                className={`w-full text-left p-4 rounded-xl transition-all font-medium ${
+                className={`relative group rounded-xl transition-all ${
                   selectedPageId === page.id
                     ? 'gradient-primary text-white shadow-lg shadow-purple-500/30'
                     : 'bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 hover:shadow-md'
                 }`}
-                data-testid={`button-page-${page.slug}`}
               >
-                <div className="font-bold">{page.title}</div>
-                <div className="text-sm mt-1 opacity-90">/{page.slug}</div>
-              </button>
+                <button
+                  onClick={() => setSelectedPageId(page.id)}
+                  className="w-full text-left p-4 font-medium"
+                  data-testid={`button-page-${page.slug}`}
+                >
+                  <div className="font-bold">{page.title}</div>
+                  <div className="text-sm mt-1 opacity-90">/{page.slug}</div>
+                </button>
+                <a
+                  href={`/n/${page.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`absolute top-3 right-3 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                    selectedPageId === page.id
+                      ? 'hover:bg-white/20'
+                      : 'hover:bg-purple-100 dark:hover:bg-purple-900/30'
+                  }`}
+                  title="View live page"
+                  data-testid={`link-view-live-${page.slug}`}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
             ))}
             {pages.length === 0 && !showNewPageForm && (
               <p className="text-sm text-muted-foreground text-center py-8">
