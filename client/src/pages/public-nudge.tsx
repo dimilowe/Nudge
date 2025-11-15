@@ -511,12 +511,33 @@ export default function PublicNudgePage() {
         shouldTrigger = scrollDepth >= threshold;
       }
 
-      // If this automation should trigger, claim the panel immediately
+      // If this automation should trigger, claim the panel and expand it
       if (shouldTrigger) {
-        const targetOffer = offers.find((o: any) => o.id === automation.offerId);
-        if (targetOffer) {
-          panelClaimedRef.current = true; // Claim panel NOW to prevent others
-          setPanelOffer(targetOffer);
+        // Check if automation has a specific target offer or is general (no offerId)
+        if (automation.offerId) {
+          // Automation targets a specific offer - only proceed if offer exists
+          const targetOffer = offers.find((o: any) => o.id === automation.offerId);
+          if (targetOffer) {
+            panelClaimedRef.current = true;
+            setPanelOffer(targetOffer);
+            setFloatingPanelCollapsed(false);
+            setTriggeredAutomations(prev => new Set([...Array.from(prev), automation.id]));
+            trackEventMutation.mutate({
+              sessionId,
+              eventType: 'automation_triggered',
+              meta: { 
+                automationId: automation.id, 
+                trigger: automation.triggerType,
+                offerId: targetOffer.id 
+              },
+            });
+            break; // Stop checking other automations
+          }
+          // Else: target offer not found yet, don't claim panel (will retry on next effect run)
+        } else {
+          // Automation has no specific offer - show general deck
+          panelClaimedRef.current = true;
+          setPanelOffer(null); // Clear any specific offer to show general deck
           setFloatingPanelCollapsed(false);
           setTriggeredAutomations(prev => new Set([...Array.from(prev), automation.id]));
           trackEventMutation.mutate({
@@ -525,7 +546,7 @@ export default function PublicNudgePage() {
             meta: { 
               automationId: automation.id, 
               trigger: automation.triggerType,
-              offerId: targetOffer.id 
+              offerId: undefined 
             },
           });
           break; // Stop checking other automations
