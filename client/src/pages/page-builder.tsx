@@ -693,6 +693,7 @@ export default function PageBuilderPage() {
                 <TabsTrigger value="offers" data-testid="tab-offers">Offers</TabsTrigger>
                 <TabsTrigger value="rules" data-testid="tab-rules">Routing Rules</TabsTrigger>
                 <TabsTrigger value="automations" data-testid="tab-automations">Automations</TabsTrigger>
+                <TabsTrigger value="experiments" data-testid="tab-experiments">Experiments</TabsTrigger>
                 <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
               </TabsList>
 
@@ -2082,6 +2083,33 @@ export default function PageBuilderPage() {
                       </p>
                     </div>
                   )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="experiments" className="mt-6">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-gradient mb-2">A/B/C Testing Experiments</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Split test different page variations to optimize conversions
+                    </p>
+                  </div>
+
+                  <Card className="p-6 bg-gradient-to-br from-purple-50/30 to-blue-50/30 dark:from-purple-900/10 dark:to-blue-900/10 border-purple-200/50">
+                    <h4 className="font-bold mb-3 text-gradient">Experiments API Ready</h4>
+                    <div className="space-y-3 text-sm text-muted-foreground">
+                      <p>The experiments backend is fully implemented with the following endpoints:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments?creatorId={creator?.id}</code> - List experiments</li>
+                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">POST /api/experiments</code> - Create experiment</li>
+                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments/:id/resolve</code> - Assign visitor to variant</li>
+                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments/:id/metrics</code> - View conversion metrics</li>
+                      </ul>
+                      <p className="mt-4">
+                        <strong>Features:</strong> A/B/C split testing, weighted traffic distribution, conversion tracking, real-time metrics
+                      </p>
+                    </div>
+                  </Card>
                 </div>
               </TabsContent>
             </Tabs>
