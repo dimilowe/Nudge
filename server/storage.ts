@@ -111,6 +111,7 @@ export interface IStorage {
   createVisitorSession(session: InsertVisitorSession): Promise<VisitorSession>;
   updateVisitorSession(id: string, updates: Partial<VisitorSession>): Promise<VisitorSession | undefined>;
   getSessionsByPageId(pageId: string, limit?: number): Promise<VisitorSession[]>;
+  getSessionsByExperimentId(experimentId: string): Promise<VisitorSession[]>;
 
   // Visitor Events
   createVisitorEvent(event: InsertVisitorEvent): Promise<VisitorEvent>;
@@ -369,6 +370,14 @@ export class DbStorage implements IStorage {
       .where(eq(visitorSessions.pageId, pageId))
       .orderBy(desc(visitorSessions.startedAt))
       .limit(limit);
+  }
+
+  async getSessionsByExperimentId(experimentId: string): Promise<VisitorSession[]> {
+    return await db
+      .select()
+      .from(visitorSessions)
+      .where(eq(visitorSessions.experimentId, experimentId))
+      .orderBy(desc(visitorSessions.startedAt));
   }
 
   // Visitor Events

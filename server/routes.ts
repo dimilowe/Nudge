@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { creators, offerViewTracking } from "@shared/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -16,6 +16,7 @@ import {
   offerFormSchema,
   automationFormSchema,
   experimentFormSchema,
+  experimentUpdateSchema,
   pageContentUpdateSchema,
   type RoutingConditions,
 } from "@shared/schema";
@@ -555,23 +556,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUT /api/experiments/:id - Update an experiment
   app.put("/api/experiments/:id", async (req, res) => {
     try {
-      // Validate traffic split if provided
-      if (req.body.trafficSplit) {
-        const split = req.body.trafficSplit;
-        
-        // Validate individual percentages are within bounds
-        if (split.a < 0 || split.a > 100 || split.b < 0 || split.b > 100 || split.c < 0 || split.c > 100) {
-          return res.status(400).json({ error: "Each traffic split percentage must be between 0 and 100" });
-        }
-        
-        // Validate sum equals 100
-        const sum = split.a + split.b + split.c;
-        if (Math.abs(sum - 100) > 0.01) {
-          return res.status(400).json({ error: "Traffic split percentages must sum to 100" });
-        }
-      }
-      
-      const experiment = await storage.updateExperiment(req.params.id, req.body);
+      const validated = experimentUpdateSchema.parse(req.body);
+      const experiment = await storage.updateExperiment(req.params.id, validated);
       if (!experiment) {
         return res.status(404).json({ error: "Experiment not found" });
       }
@@ -644,6 +630,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/experiments/:id/metrics - Get conversion metrics for experiment
+  app.get("/api/experiments/:id/metrics", async (req, res) => {
+    try {
+      const experiment = await storage.getExperiment(req.params.id);
+      if (!experiment) {
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+      
+      // Get all sessions for this experiment
+      const allSessions = await storage.getSessionsByExperimentId(experiment.id);
+      
+      // Validate sessions have correct variant/page mapping
+      const validateSession = (s: any) => {
+        if (s.variantIndex === 0) return s.pageId === experiment.variantAPageId;
+        if (s.variantIndex === 1) return s.pageId === experiment.variantBPageId;
+        if (s.variantIndex === 2) return s.pageId === experiment.variantCPageId;
+        return false; // Invalid variantIndex
+      };
+      const validSessions = allSessions.filter(validateSession);
+      
+      // Group sessions by variant
+      const variantASessions = validSessions.filter(s => s.variantIndex === 0);
+      const variantBSessions = validSessions.filter(s => s.variantIndex === 1);
+      const variantCSessions = validSessions.filter(s => s.variantIndex === 2);
+      
+      // Batch-fetch all events for all sessions at once
+      const allSessionIds = validSessions.map(s => s.id);
+      let allEvents: any[] = [];
+      
+      if (allSessionIds.length > 0) {
+        // Fetch events in batches to avoid SQL parameter limits
+        const batchSize = 100;
+        for (let i = 0; i < allSessionIds.length; i += batchSize) {
+          const batchIds = allSessionIds.slice(i, i + batchSize);
+          const events = await db
+            .select()
+            .from(visitorEvents)
+            .where(
+              and(
+                inArray(visitorEvents.sessionId, batchIds),
+                eq(visitorEvents.eventType, 'offer_click')
+              )
+            );
+          allEvents.push(...events);
+        }
+      }
+      
+      // Group events by sessionId for fast lookup
+      const conversionSessionIds = new Set(allEvents.map(e => e.sessionId));
+      
+      // Count conversions per variant
+      const variantAConversions = variantASessions.filter(s => conversionSessionIds.has(s.id)).length;
+      const variantBConversions = variantBSessions.filter(s => conversionSessionIds.has(s.id)).length;
+      const variantCConversions = variantCSessions.filter(s => conversionSessionIds.has(s.id)).length;
+      
+      // Calculate conversion rates
+      const calculateRate = (conversions: number, sessions: number) => {
+        return sessions > 0 ? (conversions / sessions) * 100 : 0;
+      };
+      
+      return res.json({
+        experiment: {
+          id: experiment.id,
+          name: experiment.name,
+          status: experiment.status,
+          targetVisitors: experiment.targetVisitors,
+          totalVisitors: validSessions.length,
+        },
+        variants: {
+          a: {
+            pageId: experiment.variantAPageId,
+            visitors: variantASessions.length,
+            conversions: variantAConversions,
+            conversionRate: calculateRate(variantAConversions, variantASessions.length),
+          },
+          b: {
+            pageId: experiment.variantBPageId,
+            visitors: variantBSessions.length,
+            conversions: variantBConversions,
+            conversionRate: calculateRate(variantBConversions, variantBSessions.length),
+          },
+          c: {
+            pageId: experiment.variantCPageId,
+            visitors: variantCSessions.length,
+            conversions: variantCConversions,
+            conversionRate: calculateRate(variantCConversions, variantCSessions.length),
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Experiment metrics error:", error);
+      return res.status(500).json({ error: "Failed to fetch experiment metrics" });
+    }
+  });
+
   // ===== VISITOR TRACKING =====
   
   // POST /api/track/session - Start or update a visitor session
@@ -673,6 +754,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         os: validated.os || null,
         intentLevel: 'low', // will be updated as user behaves
         isReturning: false, // TODO: check if fingerprint exists
+        experimentId: validated.experimentId || null,
+        variantIndex: validated.variantIndex !== undefined ? validated.variantIndex : null,
       });
       
       return res.json({ sessionId: session.id });

@@ -269,6 +269,8 @@ export const sessionStartSchema = z.object({
   utmCampaign: z.string().optional(),
   device: z.enum(["mobile", "desktop", "tablet"]),
   os: z.string().optional(),
+  experimentId: z.string().optional(), // if visitor is part of an experiment
+  variantIndex: z.number().min(0).max(2).optional(), // 0=A, 1=B, 2=C
 });
 
 export const eventTrackSchema = z.object({
@@ -321,6 +323,19 @@ export const pageContentUpdateSchema = z.object({
   theme: pageThemeSchema.optional(),
 });
 
+// Traffic split schema with validation
+const trafficSplitSchema = z.object({
+  a: z.number().min(0).max(100),
+  b: z.number().min(0).max(100),
+  c: z.number().min(0).max(100),
+}).refine(
+  (split) => {
+    const sum = split.a + split.b + split.c;
+    return Math.abs(sum - 100) < 0.01; // Allow small floating point errors
+  },
+  { message: "Traffic split percentages must sum to 100" }
+);
+
 export const experimentFormSchema = z.object({
   creatorId: z.string(),
   name: z.string().min(1).max(100),
@@ -328,19 +343,12 @@ export const experimentFormSchema = z.object({
   variantAPageId: z.string(),
   variantBPageId: z.string(),
   variantCPageId: z.string(),
-  trafficSplit: z.object({
-    a: z.number().min(0).max(100),
-    b: z.number().min(0).max(100),
-    c: z.number().min(0).max(100),
-  }).optional().refine(
-    (split) => {
-      if (!split) return true; // Allow undefined (will use default)
-      const sum = split.a + split.b + split.c;
-      return Math.abs(sum - 100) < 0.01; // Allow small floating point errors
-    },
-    { message: "Traffic split percentages must sum to 100" }
-  ),
+  trafficSplit: trafficSplitSchema.optional(),
   targetVisitors: z.number().min(10).max(10000),
+});
+
+export const experimentUpdateSchema = experimentFormSchema.partial().extend({
+  trafficSplit: trafficSplitSchema.optional(),
 });
 
 // Types
