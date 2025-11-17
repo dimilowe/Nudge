@@ -3,7 +3,8 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { creators } from "@shared/schema";
+import { creators, offerViewTracking } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -615,6 +616,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Offer view tracking error:", error);
       return res.status(400).json({ error: "Failed to track offer view" });
+    }
+  });
+
+  // GET /api/track/offer-view - Get offer view count for a session
+  app.get("/api/track/offer-view", async (req, res) => {
+    try {
+      const { sessionId, offerId, timeframeSeconds } = req.query;
+      
+      if (!sessionId || !offerId) {
+        return res.status(400).json({ error: "sessionId and offerId required" });
+      }
+      
+      const result = await db
+        .select()
+        .from(offerViewTracking)
+        .where(
+          and(
+            eq(offerViewTracking.sessionId, sessionId as string),
+            eq(offerViewTracking.offerId, offerId as string)
+          )
+        );
+      
+      if (!result[0]) {
+        return res.json({ viewCount: 0, withinTimeframe: false });
+      }
+      
+      const record = result[0];
+      
+      // Check if timeframe is specified and if views are within that window
+      if (timeframeSeconds) {
+        const timeframeMs = parseInt(timeframeSeconds as string) * 1000;
+        const now = Date.now();
+        const firstViewTime = new Date(record.firstViewAt).getTime();
+        const timeSinceFirstView = now - firstViewTime;
+        
+        const withinTimeframe = timeSinceFirstView <= timeframeMs;
+        const viewCount = withinTimeframe ? record.viewCount : 0;
+        
+        return res.json({ 
+          viewCount, 
+          withinTimeframe,
+          firstViewAt: record.firstViewAt,
+          lastViewAt: record.lastViewAt 
+        });
+      }
+      
+      // No timeframe specified, return total count
+      return res.json({ 
+        viewCount: record.viewCount, 
+        withinTimeframe: true,
+        firstViewAt: record.firstViewAt,
+        lastViewAt: record.lastViewAt 
+      });
+    } catch (error) {
+      console.error("Offer view count fetch error:", error);
+      return res.status(400).json({ error: "Failed to fetch offer view count" });
     }
   });
 

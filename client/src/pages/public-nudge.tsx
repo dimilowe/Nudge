@@ -708,6 +708,45 @@ export default function PublicNudgePage() {
         shouldTrigger = scrollDepth >= threshold;
       }
 
+      // Offer repeat view trigger (async check)
+      if (automation.triggerType === 'offer_repeat_view' && config.targetOfferId && config.minViews) {
+        // Fetch view count from backend with timeframe enforcement
+        const timeframeParam = config.timeframeSeconds ? `&timeframeSeconds=${config.timeframeSeconds}` : '';
+        fetch(`/api/track/offer-view?sessionId=${sessionId}&offerId=${config.targetOfferId}${timeframeParam}`)
+          .then(res => res.json())
+          .then(data => {
+            const viewCount = data.viewCount || 0;
+            const withinTimeframe = data.withinTimeframe !== false;
+            
+            // Only trigger if we have enough views AND they're within the timeframe (if specified)
+            if (viewCount >= config.minViews && withinTimeframe) {
+              // Check if automation hasn't been triggered and panel isn't already claimed
+              if (!triggeredAutomations.has(automation.id) && !panelClaimedRef.current) {
+                const targetOffer = offers.find((o: any) => o.id === automation.offerId);
+                if (targetOffer) {
+                  panelClaimedRef.current = true;
+                  setPanelOffer(targetOffer);
+                  setFloatingPanelCollapsed(false);
+                  setTriggeredAutomations(prev => new Set([...Array.from(prev), automation.id]));
+                  trackEventMutation.mutate({
+                    sessionId,
+                    eventType: 'automation_triggered',
+                    meta: { 
+                      automationId: automation.id, 
+                      trigger: automation.triggerType,
+                      offerId: targetOffer.id,
+                      viewCount
+                    },
+                  });
+                }
+              }
+            }
+          })
+          .catch(err => console.error('Failed to check offer view count:', err));
+        // Don't set shouldTrigger for async checks, handled in promise
+        continue;
+      }
+
       // If this automation should trigger, claim the panel and expand it
       if (shouldTrigger) {
         // Check if automation has a specific target offer or is general (no offerId)
