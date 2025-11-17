@@ -1643,6 +1643,7 @@ export default function PageBuilderPage() {
                                     <SelectItem value="time_on_page">Time on Page</SelectItem>
                                     <SelectItem value="user_hesitation">User Hesitation</SelectItem>
                                     <SelectItem value="bottom_proximity">Bottom Proximity</SelectItem>
+                                    <SelectItem value="offer_repeat_view">Offer Repeat View</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -1797,6 +1798,88 @@ export default function PageBuilderPage() {
                                 </FormItem>
                               )}
                             />
+                          )}
+
+                          {/* Offer repeat view config */}
+                          {triggerType === 'offer_repeat_view' && (
+                            <>
+                              <FormField
+                                control={automationForm.control}
+                                name="triggerConfig.targetOfferId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Target Offer to Track</FormLabel>
+                                    <Select 
+                                      onValueChange={(value) => field.onChange(value === NONE_VALUE ? undefined : value)} 
+                                      value={field.value || NONE_VALUE}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-target-offer">
+                                          <SelectValue placeholder="Select offer to track" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value={NONE_VALUE}>None</SelectItem>
+                                        {offers.map((offer: any) => (
+                                          <SelectItem key={offer.id} value={offer.id}>
+                                            {offer.title}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              <FormField
+                                control={automationForm.control}
+                                name="triggerConfig.minViews"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Minimum Views Required</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        placeholder="3"
+                                        {...field}
+                                        onChange={(e) => field.onChange(Number(e.target.value))}
+                                        data-testid="input-min-views"
+                                      />
+                                    </FormControl>
+                                    <p className="text-xs text-muted-foreground">
+                                      Number of times user must view the target offer
+                                    </p>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              <FormField
+                                control={automationForm.control}
+                                name="triggerConfig.timeframeSeconds"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Timeframe (seconds)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        placeholder="60"
+                                        {...field}
+                                        onChange={(e) => field.onChange(Number(e.target.value))}
+                                        data-testid="input-timeframe-seconds"
+                                      />
+                                    </FormControl>
+                                    <p className="text-xs text-muted-foreground">
+                                      Views must occur within this time window
+                                    </p>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </>
                           )}
 
                           <div className="flex gap-2 pt-4">
