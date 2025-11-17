@@ -53,6 +53,20 @@ export default function PageBuilderPage() {
   const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
   const [showRoutingRuleDialog, setShowRoutingRuleDialog] = useState(false);
   const [editingRoutingRule, setEditingRoutingRule] = useState<any | null>(null);
+  const [showExperimentDialog, setShowExperimentDialog] = useState(false);
+  const [editingExperiment, setEditingExperiment] = useState<any | null>(null);
+  const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
+  
+  // Experiment form state
+  const [experimentName, setExperimentName] = useState('');
+  const [experimentDescription, setExperimentDescription] = useState('');
+  const [variantAPageId, setVariantAPageId] = useState('');
+  const [variantBPageId, setVariantBPageId] = useState('');
+  const [variantCPageId, setVariantCPageId] = useState('');
+  const [trafficA, setTrafficA] = useState<number>(33);
+  const [trafficB, setTrafficB] = useState<number>(33);
+  const [trafficC, setTrafficC] = useState<number>(34);
+  const [targetVisitors, setTargetVisitors] = useState<number>(1000);
   
   // Content editor state
   const [contentHeadline, setContentHeadline] = useState('Your Amazing Headline');
@@ -279,6 +293,73 @@ export default function PageBuilderPage() {
       toast({ title: 'Routing rule deleted successfully!' });
     },
   });
+
+  // Fetch experiments for creator
+  const { data: experimentsData } = useQuery({
+    queryKey: ['/api/experiments', creator?.id],
+    queryFn: async () => {
+      if (!creator?.id) return { experiments: [] };
+      const res = await fetch(`/api/experiments?creatorId=${creator.id}`);
+      return res.json();
+    },
+    enabled: !!creator?.id,
+  });
+
+  const experiments = experimentsData?.experiments || [];
+
+  // Create experiment mutation
+  const createExperimentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('POST', '/api/experiments', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/experiments', creator?.id] });
+      setShowExperimentDialog(false);
+      setEditingExperiment(null);
+      toast({ title: 'Experiment created successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to create experiment', variant: 'destructive' });
+    },
+  });
+
+  // Update experiment mutation
+  const updateExperimentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await apiRequest('PUT', `/api/experiments/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/experiments', creator?.id] });
+      setShowExperimentDialog(false);
+      setEditingExperiment(null);
+      toast({ title: 'Experiment updated successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update experiment', variant: 'destructive' });
+    },
+  });
+
+  // Delete experiment mutation
+  const deleteExperimentMutation = useMutation({
+    mutationFn: async (experimentId: string) => {
+      return await apiRequest('DELETE', `/api/experiments/${experimentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/experiments', creator?.id] });
+      toast({ title: 'Experiment deleted successfully!' });
+    },
+  });
+
+  // Fetch experiment metrics
+  const { data: metricsData } = useQuery({
+    queryKey: ['/api/experiments', selectedExperimentId, 'metrics'],
+    queryFn: async () => {
+      if (!selectedExperimentId) return null;
+      const res = await fetch(`/api/experiments/${selectedExperimentId}/metrics`);
+      return res.json();
+    },
+    enabled: !!selectedExperimentId,
+  });
   
   // Update page content mutation
   const updateContentMutation = useMutation({
@@ -293,6 +374,59 @@ export default function PageBuilderPage() {
       toast({ title: 'Failed to save content', variant: 'destructive' });
     },
   });
+
+  // Experiment form submit handler
+  const handleSubmitExperiment = () => {
+    if (!creator?.id || !experimentName || !variantAPageId || !variantBPageId || !variantCPageId) {
+      toast({ title: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+
+    // Ensure traffic split sums to 100
+    const totalTraffic = Number(trafficA) + Number(trafficB) + Number(trafficC);
+    if (Math.abs(totalTraffic - 100) > 0.01) {
+      toast({ 
+        title: 'Traffic split must sum to 100%', 
+        description: `Current sum: ${totalTraffic}%`,
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    const data = {
+      creatorId: creator.id,
+      name: experimentName,
+      description: experimentDescription || undefined,
+      variantAPageId,
+      variantBPageId,
+      variantCPageId,
+      trafficSplit: { 
+        a: Number(trafficA), 
+        b: Number(trafficB), 
+        c: Number(trafficC) 
+      },
+      targetVisitors: Number(targetVisitors),
+    };
+
+    if (editingExperiment) {
+      updateExperimentMutation.mutate({ id: editingExperiment.id, data });
+    } else {
+      createExperimentMutation.mutate(data);
+    }
+  };
+
+  // Reset experiment form
+  const resetExperimentForm = () => {
+    setExperimentName('');
+    setExperimentDescription('');
+    setVariantAPageId('');
+    setVariantBPageId('');
+    setVariantCPageId('');
+    setTrafficA(33);
+    setTrafficB(33);
+    setTrafficC(34);
+    setTargetVisitors(1000);
+  };
 
   // New page form
   const pageForm = useForm<NudgePageFormData & { creatorId: string }>({
@@ -2088,28 +2222,282 @@ export default function PageBuilderPage() {
 
               <TabsContent value="experiments" className="mt-6">
                 <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-gradient mb-2">A/B/C Testing Experiments</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Split test different page variations to optimize conversions
-                    </p>
-                  </div>
-
-                  <Card className="p-6 bg-gradient-to-br from-purple-50/30 to-blue-50/30 dark:from-purple-900/10 dark:to-blue-900/10 border-purple-200/50">
-                    <h4 className="font-bold mb-3 text-gradient">Experiments API Ready</h4>
-                    <div className="space-y-3 text-sm text-muted-foreground">
-                      <p>The experiments backend is fully implemented with the following endpoints:</p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments?creatorId={creator?.id}</code> - List experiments</li>
-                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">POST /api/experiments</code> - Create experiment</li>
-                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments/:id/resolve</code> - Assign visitor to variant</li>
-                        <li><code className="text-xs bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">GET /api/experiments/:id/metrics</code> - View conversion metrics</li>
-                      </ul>
-                      <p className="mt-4">
-                        <strong>Features:</strong> A/B/C split testing, weighted traffic distribution, conversion tracking, real-time metrics
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-gradient mb-2">A/B/C Testing Experiments</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Split test different page variations to optimize conversions
                       </p>
                     </div>
-                  </Card>
+                    <Button onClick={() => {
+                      setEditingExperiment(null);
+                      setShowExperimentDialog(true);
+                    }} data-testid="button-create-experiment">
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Experiment
+                    </Button>
+                  </div>
+
+                  {/* Experiments List */}
+                  {experiments.length > 0 ? (
+                    <div className="grid gap-4">
+                      {experiments.map((exp: any) => (
+                        <Card key={exp.id} className="p-5 hover:shadow-lg transition-shadow" data-testid={`card-experiment-${exp.id}`}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-bold">{exp.name}</h4>
+                                <Badge variant={exp.status === 'running' ? 'default' : exp.status === 'completed' ? 'secondary' : 'outline'}>
+                                  {exp.status}
+                                </Badge>
+                              </div>
+                              {exp.description && (
+                                <p className="text-sm text-muted-foreground">{exp.description}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => setSelectedExperimentId(selectedExperimentId === exp.id ? null : exp.id)}
+                                data-testid={`button-view-metrics-${exp.id}`}
+                              >
+                                <BarChart3 className="w-4 h-4 mr-1" />
+                                {selectedExperimentId === exp.id ? 'Hide' : 'View'} Metrics
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => deleteExperimentMutation.mutate(exp.id)}
+                                data-testid={`button-delete-experiment-${exp.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Traffic Split</p>
+                              <p className="font-medium">
+                                A: {exp.trafficSplit?.a || 33}% | B: {exp.trafficSplit?.b || 33}% | C: {exp.trafficSplit?.c || 34}%
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Target Visitors</p>
+                              <p className="font-medium">{exp.targetVisitors}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Created</p>
+                              <p className="font-medium">{new Date(exp.createdAt).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+
+                          {/* Metrics Preview */}
+                          {selectedExperimentId === exp.id && metricsData && (
+                            <div className="mt-4 pt-4 border-t">
+                              <h5 className="font-bold mb-3">Conversion Metrics</h5>
+                              <div className="grid grid-cols-3 gap-4">
+                                {['a', 'b', 'c'].map((variant) => {
+                                  const variantData = metricsData.variants[variant];
+                                  return (
+                                    <Card key={variant} className="p-4 bg-gradient-to-br from-purple-50/30 to-blue-50/30 dark:from-purple-900/10 dark:to-blue-900/10">
+                                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                                        Variant {variant.toUpperCase()}
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Visitors</p>
+                                          <p className="text-lg font-bold">{variantData.visitors}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Conversions</p>
+                                          <p className="text-lg font-bold">{variantData.conversions}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Conv. Rate</p>
+                                          <p className="text-lg font-bold text-gradient">{variantData.conversionRate.toFixed(2)}%</p>
+                                        </div>
+                                      </div>
+                                    </Card>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-3 text-sm text-muted-foreground">
+                                Total Visitors: {metricsData.experiment.totalVisitors} / {metricsData.experiment.targetVisitors}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="p-12 text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-3" />
+                      <p className="text-muted-foreground mb-2">No experiments yet</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Create your first A/B/C test to optimize conversions
+                      </p>
+                      <Button onClick={() => {
+                        setEditingExperiment(null);
+                        setShowExperimentDialog(true);
+                      }} data-testid="button-create-first-experiment">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Experiment
+                      </Button>
+                    </Card>
+                  )}
+
+                  {/* Create/Edit Experiment Dialog */}
+                  <Dialog open={showExperimentDialog} onOpenChange={setShowExperimentDialog}>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>{editingExperiment ? 'Edit Experiment' : 'Create New Experiment'}</DialogTitle>
+                        <DialogDescription>
+                          Set up an A/B/C split test with different page variations
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Experiment Name</label>
+                          <Input 
+                            placeholder="Homepage Hero Test"
+                            value={experimentName}
+                            onChange={(e) => setExperimentName(e.target.value)}
+                            data-testid="input-experiment-name"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium">Description (Optional)</label>
+                          <Textarea 
+                            placeholder="Testing different hero headlines for conversion..."
+                            value={experimentDescription}
+                            onChange={(e) => setExperimentDescription(e.target.value)}
+                            data-testid="input-experiment-description"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-sm font-medium">Variant A Page</label>
+                            <Select value={variantAPageId} onValueChange={setVariantAPageId}>
+                              <SelectTrigger data-testid="select-variant-a">
+                                <SelectValue placeholder="Select page" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pages.map((page: any) => (
+                                  <SelectItem key={page.id} value={page.id}>
+                                    {page.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Variant B Page</label>
+                            <Select value={variantBPageId} onValueChange={setVariantBPageId}>
+                              <SelectTrigger data-testid="select-variant-b">
+                                <SelectValue placeholder="Select page" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pages.map((page: any) => (
+                                  <SelectItem key={page.id} value={page.id}>
+                                    {page.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Variant C Page</label>
+                            <Select value={variantCPageId} onValueChange={setVariantCPageId}>
+                              <SelectTrigger data-testid="select-variant-c">
+                                <SelectValue placeholder="Select page" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pages.map((page: any) => (
+                                  <SelectItem key={page.id} value={page.id}>
+                                    {page.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-sm font-medium">Traffic % A</label>
+                            <Input 
+                              type="number" 
+                              placeholder="33" 
+                              min="0" 
+                              max="100"
+                              value={trafficA}
+                              onChange={(e) => setTrafficA(Number(e.target.value))}
+                              data-testid="input-traffic-a" 
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Traffic % B</label>
+                            <Input 
+                              type="number" 
+                              placeholder="33" 
+                              min="0" 
+                              max="100"
+                              value={trafficB}
+                              onChange={(e) => setTrafficB(Number(e.target.value))}
+                              data-testid="input-traffic-b" 
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Traffic % C</label>
+                            <Input 
+                              type="number" 
+                              placeholder="34" 
+                              min="0" 
+                              max="100"
+                              value={trafficC}
+                              onChange={(e) => setTrafficC(Number(e.target.value))}
+                              data-testid="input-traffic-c" 
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium">Target Visitors</label>
+                          <Input 
+                            type="number" 
+                            placeholder="1000" 
+                            min="10" 
+                            max="10000"
+                            value={targetVisitors}
+                            onChange={(e) => setTargetVisitors(Number(e.target.value))}
+                            data-testid="input-target-visitors" 
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Experiment will auto-complete after reaching this many visitors
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2 justify-end pt-4">
+                          <Button variant="outline" onClick={() => {
+                            setShowExperimentDialog(false);
+                            resetExperimentForm();
+                          }}>
+                            Cancel
+                          </Button>
+                          <Button onClick={handleSubmitExperiment} data-testid="button-save-experiment">
+                            {editingExperiment ? 'Update' : 'Create'} Experiment
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </TabsContent>
             </Tabs>
