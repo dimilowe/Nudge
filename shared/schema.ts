@@ -80,6 +80,24 @@ export const automations = pgTable("automations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Experiments (A/B/C testing for page variants)
+export const experiments = pgTable("experiments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  variantAPageId: varchar("variant_a_page_id").notNull(),
+  variantBPageId: varchar("variant_b_page_id").notNull(),
+  variantCPageId: varchar("variant_c_page_id").notNull(),
+  trafficSplit: jsonb("traffic_split").default(sql`'{"a": 33, "b": 33, "c": 34}'`).notNull(), // percentage split for each variant
+  targetVisitors: integer("target_visitors").notNull(), // experiment completes after this many visitors
+  status: text("status").default('draft').notNull(), // 'draft' | 'running' | 'completed'
+  winnerId: varchar("winner_id"), // pageId of winning variant (set when completed)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
 // Visitor Sessions (track each visitor)
 export const visitorSessions = pgTable("visitor_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -94,6 +112,8 @@ export const visitorSessions = pgTable("visitor_sessions", {
   os: text("os"), // 'ios' | 'android' | 'windows' | 'macos' | 'other'
   intentLevel: text("intent_level"), // 'low' | 'medium' | 'high' | 'buyer'
   isReturning: boolean("is_returning").default(false).notNull(),
+  experimentId: varchar("experiment_id"), // if part of A/B/C test
+  variantIndex: integer("variant_index"), // 0, 1, or 2 for variant A, B, or C
   startedAt: timestamp("started_at").defaultNow().notNull(),
   lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
 });
@@ -217,6 +237,13 @@ export const insertAutomationSchema = createInsertSchema(automations).omit({
   createdAt: true,
 });
 
+export const insertExperimentSchema = createInsertSchema(experiments).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+
 export const insertVisitorSessionSchema = createInsertSchema(visitorSessions).omit({
   id: true,
   startedAt: true,
@@ -294,6 +321,28 @@ export const pageContentUpdateSchema = z.object({
   theme: pageThemeSchema.optional(),
 });
 
+export const experimentFormSchema = z.object({
+  creatorId: z.string(),
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  variantAPageId: z.string(),
+  variantBPageId: z.string(),
+  variantCPageId: z.string(),
+  trafficSplit: z.object({
+    a: z.number().min(0).max(100),
+    b: z.number().min(0).max(100),
+    c: z.number().min(0).max(100),
+  }).optional().refine(
+    (split) => {
+      if (!split) return true; // Allow undefined (will use default)
+      const sum = split.a + split.b + split.c;
+      return Math.abs(sum - 100) < 0.01; // Allow small floating point errors
+    },
+    { message: "Traffic split percentages must sum to 100" }
+  ),
+  targetVisitors: z.number().min(10).max(10000),
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -313,6 +362,9 @@ export type RoutingRule = typeof routingRules.$inferSelect;
 export type InsertAutomation = z.infer<typeof insertAutomationSchema>;
 export type Automation = typeof automations.$inferSelect;
 
+export type InsertExperiment = z.infer<typeof insertExperimentSchema>;
+export type Experiment = typeof experiments.$inferSelect;
+
 export type InsertVisitorSession = z.infer<typeof insertVisitorSessionSchema>;
 export type VisitorSession = typeof visitorSessions.$inferSelect;
 
@@ -328,6 +380,7 @@ export type RouteRequest = z.infer<typeof routeRequestSchema>;
 export type OfferFormData = z.infer<typeof offerFormSchema>;
 export type AutomationFormData = z.infer<typeof automationFormSchema>;
 export type NudgePageFormData = z.infer<typeof nudgePageFormSchema>;
+export type ExperimentFormData = z.infer<typeof experimentFormSchema>;
 export type RoutingConditions = z.infer<typeof routingConditionsSchema>;
 export type TriggerConfig = z.infer<typeof triggerConfigSchema>;
 export type OverlayContent = z.infer<typeof overlayContentSchema>;

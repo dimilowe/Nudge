@@ -11,6 +11,8 @@ import {
   type InsertRoutingRule,
   type Automation,
   type InsertAutomation,
+  type Experiment,
+  type InsertExperiment,
   type VisitorSession,
   type InsertVisitorSession,
   type VisitorEvent,
@@ -26,6 +28,7 @@ import {
   offers,
   routingRules,
   automations,
+  experiments,
   visitorSessions,
   visitorEvents,
   offerPerformance,
@@ -95,6 +98,13 @@ export interface IStorage {
   createAutomation(automation: InsertAutomation): Promise<Automation>;
   updateAutomation(id: string, updates: Partial<InsertAutomation>): Promise<Automation | undefined>;
   deleteAutomation(id: string): Promise<boolean>;
+
+  // Experiments
+  getExperiment(id: string): Promise<Experiment | undefined>;
+  getExperimentsByCreatorId(creatorId: string): Promise<Experiment[]>;
+  createExperiment(experiment: InsertExperiment): Promise<Experiment>;
+  updateExperiment(id: string, updates: Partial<InsertExperiment>): Promise<Experiment | undefined>;
+  deleteExperiment(id: string): Promise<boolean>;
 
   // Visitor Sessions
   getVisitorSession(id: string): Promise<VisitorSession | undefined>;
@@ -296,6 +306,39 @@ export class DbStorage implements IStorage {
 
   async deleteAutomation(id: string): Promise<boolean> {
     const result = await db.delete(automations).where(eq(automations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Experiments
+  async getExperiment(id: string): Promise<Experiment | undefined> {
+    const result = await db.select().from(experiments).where(eq(experiments.id, id));
+    return result[0];
+  }
+
+  async getExperimentsByCreatorId(creatorId: string): Promise<Experiment[]> {
+    return await db
+      .select()
+      .from(experiments)
+      .where(eq(experiments.creatorId, creatorId))
+      .orderBy(desc(experiments.createdAt));
+  }
+
+  async createExperiment(insertExperiment: InsertExperiment): Promise<Experiment> {
+    const result = await db.insert(experiments).values(insertExperiment).returning();
+    return result[0];
+  }
+
+  async updateExperiment(id: string, updates: Partial<InsertExperiment>): Promise<Experiment | undefined> {
+    const result = await db
+      .update(experiments)
+      .set(updates)
+      .where(eq(experiments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteExperiment(id: string): Promise<boolean> {
+    const result = await db.delete(experiments).where(eq(experiments.id, id)).returning();
     return result.length > 0;
   }
 
@@ -518,24 +561,48 @@ export class DbStorage implements IStorage {
 
   // Offer View Tracking (for behavioral triggers)
   async incrementOfferViewCount(sessionId: string, offerId: string): Promise<number> {
-    // Use upsert: if record exists, increment viewCount and update lastViewAt
-    // If not, create new record with viewCount = 1
+    // First check if record exists and if it's expired (for timeframe-based tracking)
+    const existing = await db
+      .select()
+      .from(offerViewTracking)
+      .where(
+        and(
+          eq(offerViewTracking.sessionId, sessionId),
+          eq(offerViewTracking.offerId, offerId)
+        )
+      );
+    
+    const now = new Date();
+    
+    // If no existing record, create new one
+    if (!existing[0]) {
+      const result = await db
+        .insert(offerViewTracking)
+        .values({
+          sessionId,
+          offerId,
+          viewCount: 1,
+          firstViewAt: now,
+          lastViewAt: now,
+        })
+        .returning();
+      
+      return result[0].viewCount;
+    }
+    
+    // Record exists, increment count and update lastViewAt
     const result = await db
-      .insert(offerViewTracking)
-      .values({
-        sessionId,
-        offerId,
-        viewCount: 1,
-        firstViewAt: new Date(),
-        lastViewAt: new Date(),
+      .update(offerViewTracking)
+      .set({
+        viewCount: sql`${offerViewTracking.viewCount} + 1`,
+        lastViewAt: now,
       })
-      .onConflictDoUpdate({
-        target: [offerViewTracking.sessionId, offerViewTracking.offerId],
-        set: {
-          viewCount: sql`${offerViewTracking.viewCount} + 1`,
-          lastViewAt: new Date(),
-        },
-      })
+      .where(
+        and(
+          eq(offerViewTracking.sessionId, sessionId),
+          eq(offerViewTracking.offerId, offerId)
+        )
+      )
       .returning();
     
     return result[0].viewCount;

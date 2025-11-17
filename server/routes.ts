@@ -15,6 +15,7 @@ import {
   nudgePageFormSchema,
   offerFormSchema,
   automationFormSchema,
+  experimentFormSchema,
   pageContentUpdateSchema,
   type RoutingConditions,
 } from "@shared/schema";
@@ -518,6 +519,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== EXPERIMENTS =====
+  
+  // GET /api/experiments - Get experiments for a creator
+  app.get("/api/experiments", async (req, res) => {
+    try {
+      const creatorId = req.query.creatorId as string;
+      if (!creatorId) {
+        return res.status(400).json({ error: "creatorId required" });
+      }
+      
+      const experiments = await storage.getExperimentsByCreatorId(creatorId);
+      return res.json({ experiments });
+    } catch (error) {
+      console.error("Experiments fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch experiments" });
+    }
+  });
+  
+  // POST /api/experiments - Create an experiment
+  app.post("/api/experiments", async (req, res) => {
+    try {
+      const validated = experimentFormSchema.parse(req.body);
+      const experiment = await storage.createExperiment({
+        ...validated,
+        status: 'draft',
+      });
+      return res.json({ experiment });
+    } catch (error) {
+      console.error("Experiment creation error:", error);
+      return res.status(400).json({ error: "Failed to create experiment" });
+    }
+  });
+  
+  // PUT /api/experiments/:id - Update an experiment
+  app.put("/api/experiments/:id", async (req, res) => {
+    try {
+      // Validate traffic split if provided
+      if (req.body.trafficSplit) {
+        const split = req.body.trafficSplit;
+        
+        // Validate individual percentages are within bounds
+        if (split.a < 0 || split.a > 100 || split.b < 0 || split.b > 100 || split.c < 0 || split.c > 100) {
+          return res.status(400).json({ error: "Each traffic split percentage must be between 0 and 100" });
+        }
+        
+        // Validate sum equals 100
+        const sum = split.a + split.b + split.c;
+        if (Math.abs(sum - 100) > 0.01) {
+          return res.status(400).json({ error: "Traffic split percentages must sum to 100" });
+        }
+      }
+      
+      const experiment = await storage.updateExperiment(req.params.id, req.body);
+      if (!experiment) {
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+      return res.json({ experiment });
+    } catch (error) {
+      console.error("Experiment update error:", error);
+      return res.status(400).json({ error: "Failed to update experiment" });
+    }
+  });
+  
+  // DELETE /api/experiments/:id - Delete an experiment
+  app.delete("/api/experiments/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteExperiment(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Experiment deletion error:", error);
+      return res.status(500).json({ error: "Failed to delete experiment" });
+    }
+  });
+
+  // GET /api/experiments/:id/resolve - Assign visitor to variant and return redirect info
+  app.get("/api/experiments/:id/resolve", async (req, res) => {
+    try {
+      const experiment = await storage.getExperiment(req.params.id);
+      if (!experiment) {
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+      
+      // Check if experiment is active
+      if (experiment.status !== 'running') {
+        return res.status(400).json({ error: "Experiment is not running" });
+      }
+      
+      // Randomly assign to variant based on traffic split
+      const split = experiment.trafficSplit as { a: number; b: number; c: number };
+      const rand = Math.random() * 100;
+      let variantIndex = 0;
+      let variantPageId = experiment.variantAPageId;
+      
+      if (rand < split.a) {
+        variantIndex = 0;
+        variantPageId = experiment.variantAPageId;
+      } else if (rand < split.a + split.b) {
+        variantIndex = 1;
+        variantPageId = experiment.variantBPageId;
+      } else {
+        variantIndex = 2;
+        variantPageId = experiment.variantCPageId;
+      }
+      
+      // Get the variant page to return its slug
+      const variantPage = await storage.getNudgePage(variantPageId);
+      if (!variantPage) {
+        return res.status(404).json({ error: "Variant page not found" });
+      }
+      
+      return res.json({
+        experimentId: experiment.id,
+        variantIndex,
+        variantPageId,
+        pageSlug: variantPage.slug,
+      });
+    } catch (error) {
+      console.error("Experiment resolve error:", error);
+      return res.status(500).json({ error: "Failed to resolve experiment" });
+    }
+  });
+
   // ===== VISITOR TRACKING =====
   
   // POST /api/track/session - Start or update a visitor session
@@ -639,19 +765,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       
       if (!result[0]) {
-        return res.json({ viewCount: 0, withinTimeframe: false });
+        return res.json({ viewCount: 0, withinTimeframe: true });
       }
       
       const record = result[0];
+      const now = Date.now();
+      const firstViewTime = new Date(record.firstViewAt).getTime();
+      const timeSinceFirstView = now - firstViewTime;
       
       // Check if timeframe is specified and if views are within that window
       if (timeframeSeconds) {
         const timeframeMs = parseInt(timeframeSeconds as string) * 1000;
-        const now = Date.now();
-        const firstViewTime = new Date(record.firstViewAt).getTime();
-        const timeSinceFirstView = now - firstViewTime;
-        
         const withinTimeframe = timeSinceFirstView <= timeframeMs;
+        
+        // If outside timeframe, return 0 count (window expired, will reset on next increment)
         const viewCount = withinTimeframe ? record.viewCount : 0;
         
         return res.json({ 
@@ -662,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // No timeframe specified, return total count
+      // No timeframe specified, return total count (always within timeframe)
       return res.json({ 
         viewCount: record.viewCount, 
         withinTimeframe: true,
