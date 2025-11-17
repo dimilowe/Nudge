@@ -335,11 +335,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/offers", async (req, res) => {
     try {
       const pageId = req.query.pageId as string;
+      const includeHidden = req.query.includeHidden === "true";
+      
       if (!pageId) {
         return res.status(400).json({ error: "pageId required" });
       }
       
-      const offers = await storage.getOffersByPageId(pageId);
+      let offers = await storage.getOffersByPageId(pageId);
+      
+      // Filter out hidden offers for public landing page (unless explicitly requested)
+      if (!includeHidden) {
+        offers = offers.filter(offer => !offer.isHidden);
+      }
+      
       return res.json({ offers });
     } catch (error) {
       console.error("Offers fetch error:", error);

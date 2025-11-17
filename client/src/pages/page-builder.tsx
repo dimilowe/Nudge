@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Form,
@@ -89,12 +90,12 @@ export default function PageBuilderPage() {
   const pages = pagesData?.pages || [];
   const selectedPage = pages.find((p: any) => p.id === selectedPageId);
 
-  // Fetch offers for selected page
+  // Fetch offers for selected page (including hidden offers for admin)
   const { data: offersData } = useQuery({
     queryKey: ['/api/offers', selectedPageId],
     queryFn: async () => {
       if (!selectedPageId) return { offers: [] };
-      const res = await fetch(`/api/offers?pageId=${selectedPageId}`);
+      const res = await fetch(`/api/offers?pageId=${selectedPageId}&includeHidden=true`);
       return res.json();
     },
     enabled: !!selectedPageId,
@@ -1066,6 +1067,29 @@ export default function PageBuilderPage() {
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={offerForm.control}
+                          name="isHidden"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-offer-hidden"
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>
+                                  Hidden Offer
+                                </FormLabel>
+                                <p className="text-sm text-muted-foreground">
+                                  Hide from landing page (only show via behavioral triggers or routing rules)
+                                </p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
                         <div className="flex gap-2">
                           <Button type="submit" size="sm" data-testid="button-create-offer">
                             Create Offer
@@ -1184,6 +1208,29 @@ export default function PageBuilderPage() {
                                 </SelectContent>
                               </Select>
                               <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={offerForm.control}
+                          name="isHidden"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-edit-offer-hidden"
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>
+                                  Hidden Offer
+                                </FormLabel>
+                                <p className="text-sm text-muted-foreground">
+                                  Hide from landing page (only show via behavioral triggers or routing rules)
+                                </p>
+                              </div>
                             </FormItem>
                           )}
                         />
