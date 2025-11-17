@@ -113,6 +113,11 @@ export interface IStorage {
   // Analytics
   getPageAnalytics(pageId: string): Promise<PageAnalytics>;
   getOfferAnalytics(offerId: string): Promise<OfferAnalytics>;
+
+  // Offer View Tracking (for behavioral triggers)
+  incrementOfferViewCount(sessionId: string, offerId: string): Promise<number>;
+  getOfferViewCount(sessionId: string, offerId: string): Promise<number>;
+  getOfferViewCounts(sessionId: string): Promise<Map<string, number>>;
 }
 
 export class DbStorage implements IStorage {

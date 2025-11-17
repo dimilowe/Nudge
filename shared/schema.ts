@@ -50,6 +50,7 @@ export const offers = pgTable("offers", {
   funnelStage: text("funnel_stage").notNull(), // 'lead_capture' | 'entry' | 'core' | 'premium' | 'upsell'
   displayOrder: integer("display_order").default(0).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  isHidden: boolean("is_hidden").default(false).notNull(), // hidden offers only show in overlay via routing/behavioral triggers
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -70,8 +71,8 @@ export const automations = pgTable("automations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   pageId: varchar("page_id").notNull(),
   name: text("name").notNull(),
-  triggerType: text("trigger_type").notNull(), // 'scroll_depth' | 'time_on_page' | 'exit_intent' | 'section_view' | 'user_hesitation' | 'bottom_proximity'
-  triggerConfig: jsonb("trigger_config").notNull(), // { scrollPercent?: number, seconds?: number, sectionId?: string, hesitationSeconds?: number }
+  triggerType: text("trigger_type").notNull(), // 'scroll_depth' | 'time_on_page' | 'exit_intent' | 'section_view' | 'user_hesitation' | 'bottom_proximity' | 'offer_repeat_view'
+  triggerConfig: jsonb("trigger_config").notNull(), // { scrollPercent?: number, seconds?: number, sectionId?: string, hesitationSeconds?: number, targetOfferId?: string, minViews?: number, timeframeSeconds?: number }
   offerId: varchar("offer_id"), // which offer to show in the overlay
   overlayTemplate: text("overlay_template").notNull(), // 'popup' | 'slide_in' | 'banner' | 'toast'
   overlayContent: jsonb("overlay_content"), // custom headline, description overrides
@@ -106,6 +107,18 @@ export const visitorEvents = pgTable("visitor_events", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
+// Offer View Tracking (for behavioral triggers)
+export const offerViewTracking = pgTable("offer_view_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  offerId: varchar("offer_id").notNull(),
+  viewCount: integer("view_count").default(1).notNull(),
+  firstViewAt: timestamp("first_view_at").defaultNow().notNull(),
+  lastViewAt: timestamp("last_view_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueSessionOffer: sql`UNIQUE (${table.sessionId}, ${table.offerId})`
+}));
+
 // Offer Performance (analytics aggregation)
 export const offerPerformance = pgTable("offer_performance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -135,6 +148,10 @@ export const triggerConfigSchema = z.object({
   seconds: z.number().optional(),
   sectionId: z.string().optional(),
   hesitationSeconds: z.number().optional(),
+  // Behavioral triggers for offer_repeat_view
+  targetOfferId: z.string().optional(), // which offer to track views for
+  minViews: z.number().optional(), // minimum views before triggering (e.g., 3)
+  timeframeSeconds: z.number().optional(), // time window to count views (e.g., 300 for 5 min)
 });
 
 // Overlay content schema
@@ -251,12 +268,13 @@ export const offerFormSchema = z.object({
   funnelStage: z.enum(["lead_capture", "entry", "core", "premium", "upsell"]),
   displayOrder: z.number().optional(),
   isActive: z.boolean().optional(),
+  isHidden: z.boolean().optional(),
 });
 
 export const automationFormSchema = z.object({
   pageId: z.string(),
   name: z.string().min(1).max(100),
-  triggerType: z.enum(["scroll_depth", "time_on_page", "exit_intent", "section_view", "user_hesitation", "bottom_proximity"]),
+  triggerType: z.enum(["scroll_depth", "time_on_page", "exit_intent", "section_view", "user_hesitation", "bottom_proximity", "offer_repeat_view"]),
   triggerConfig: triggerConfigSchema,
   offerId: z.string().optional(),
   overlayTemplate: z.enum(["popup", "slide_in", "banner", "toast"]),
