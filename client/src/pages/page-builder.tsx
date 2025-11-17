@@ -50,6 +50,8 @@ export default function PageBuilderPage() {
   const [editingOffer, setEditingOffer] = useState<any | null>(null);
   const [showAutomationDialog, setShowAutomationDialog] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
+  const [showRoutingRuleDialog, setShowRoutingRuleDialog] = useState(false);
+  const [editingRoutingRule, setEditingRoutingRule] = useState<any | null>(null);
   
   // Content editor state
   const [contentHeadline, setContentHeadline] = useState('Your Amazing Headline');
@@ -218,6 +220,62 @@ export default function PageBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/automations', selectedPageId] });
       toast({ title: 'Automation deleted successfully!' });
+    },
+  });
+
+  // Fetch routing rules for selected page
+  const { data: routingRulesData } = useQuery({
+    queryKey: ['/api/routing-rules', selectedPageId],
+    queryFn: async () => {
+      if (!selectedPageId) return { rules: [] };
+      const res = await fetch(`/api/routing-rules?pageId=${selectedPageId}`);
+      return res.json();
+    },
+    enabled: !!selectedPageId,
+  });
+
+  const routingRules = routingRulesData?.rules || [];
+
+  // Create routing rule mutation
+  const createRoutingRuleMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('POST', '/api/routing-rules', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/routing-rules', selectedPageId] });
+      setShowRoutingRuleDialog(false);
+      setEditingRoutingRule(null);
+      toast({ title: 'Routing rule created successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to create routing rule', variant: 'destructive' });
+    },
+  });
+
+  // Update routing rule mutation
+  const updateRoutingRuleMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await apiRequest('PUT', `/api/routing-rules/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/routing-rules', selectedPageId] });
+      setShowRoutingRuleDialog(false);
+      setEditingRoutingRule(null);
+      toast({ title: 'Routing rule updated successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update routing rule', variant: 'destructive' });
+    },
+  });
+
+  // Delete routing rule mutation
+  const deleteRoutingRuleMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      return await apiRequest('DELETE', `/api/routing-rules/${ruleId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/routing-rules', selectedPageId] });
+      toast({ title: 'Routing rule deleted successfully!' });
     },
   });
   
@@ -1212,11 +1270,268 @@ export default function PageBuilderPage() {
               </TabsContent>
 
               <TabsContent value="rules" className="mt-6">
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-2">Routing Rules</p>
-                  <p className="text-sm text-muted-foreground">
-                    Coming soon: Set up smart routing rules to show different offers based on traffic source, device, and behavior.
-                  </p>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-lg">Smart Routing Rules</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Show different offers based on traffic source, device, and behavior
+                    </p>
+                  </div>
+                  <Dialog open={showRoutingRuleDialog} onOpenChange={setShowRoutingRuleDialog}>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => {
+                        setEditingRoutingRule(null);
+                        setShowRoutingRuleDialog(true);
+                      }} data-testid="button-create-routing-rule">
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Rule
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingRoutingRule ? 'Edit Routing Rule' : 'Create Routing Rule'}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Define conditions to show specific offers to targeted visitors
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Target Offer *</label>
+                          <Select
+                            value={editingRoutingRule?.offerId || ''}
+                            onValueChange={(val) => setEditingRoutingRule({ ...editingRoutingRule, offerId: val })}
+                          >
+                            <SelectTrigger data-testid="select-rule-offer">
+                              <SelectValue placeholder="Select an offer" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {offers.map((offer: any) => (
+                                <SelectItem key={offer.id} value={offer.id}>
+                                  {offer.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium">Priority</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={editingRoutingRule?.priority || 0}
+                            onChange={(e) => setEditingRoutingRule({ ...editingRoutingRule, priority: Number(e.target.value) })}
+                            data-testid="input-rule-priority"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Higher priority rules are evaluated first</p>
+                        </div>
+
+                        <div className="space-y-3 border-t pt-4">
+                          <h4 className="font-medium text-sm">Conditions (all optional)</h4>
+                          
+                          <div>
+                            <label className="text-sm font-medium">Traffic Source</label>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {['instagram', 'tiktok', 'youtube', 'pinterest', 'email', 'direct'].map((source) => (
+                                <label key={source} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingRoutingRule?.conditions?.trafficSource?.includes(source) || false}
+                                    onChange={(e) => {
+                                      const current = editingRoutingRule?.conditions?.trafficSource || [];
+                                      const updated = e.target.checked
+                                        ? [...current, source]
+                                        : current.filter((s: string) => s !== source);
+                                      setEditingRoutingRule({
+                                        ...editingRoutingRule,
+                                        conditions: { ...editingRoutingRule?.conditions, trafficSource: updated.length > 0 ? updated : undefined }
+                                      });
+                                    }}
+                                  />
+                                  {source}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Device Type</label>
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              {['mobile', 'desktop', 'tablet'].map((device) => (
+                                <label key={device} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingRoutingRule?.conditions?.device?.includes(device) || false}
+                                    onChange={(e) => {
+                                      const current = editingRoutingRule?.conditions?.device || [];
+                                      const updated = e.target.checked
+                                        ? [...current, device]
+                                        : current.filter((d: string) => d !== device);
+                                      setEditingRoutingRule({
+                                        ...editingRoutingRule,
+                                        conditions: { ...editingRoutingRule?.conditions, device: updated.length > 0 ? updated : undefined }
+                                      });
+                                    }}
+                                  />
+                                  {device}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Intent Level</label>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {['low', 'medium', 'high', 'buyer'].map((intent) => (
+                                <label key={intent} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingRoutingRule?.conditions?.intentLevel?.includes(intent) || false}
+                                    onChange={(e) => {
+                                      const current = editingRoutingRule?.conditions?.intentLevel || [];
+                                      const updated = e.target.checked
+                                        ? [...current, intent]
+                                        : current.filter((i: string) => i !== intent);
+                                      setEditingRoutingRule({
+                                        ...editingRoutingRule,
+                                        conditions: { ...editingRoutingRule?.conditions, intentLevel: updated.length > 0 ? updated : undefined }
+                                      });
+                                    }}
+                                  />
+                                  {intent}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="flex items-center gap-2 text-sm font-medium">
+                              <input
+                                type="checkbox"
+                                checked={editingRoutingRule?.conditions?.returning === true}
+                                onChange={(e) => {
+                                  setEditingRoutingRule({
+                                    ...editingRoutingRule,
+                                    conditions: {
+                                      ...editingRoutingRule?.conditions,
+                                      returning: e.target.checked ? true : undefined
+                                    }
+                                  });
+                                }}
+                              />
+                              Returning Visitors Only
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-4">
+                          <Button
+                            onClick={() => {
+                              if (!editingRoutingRule?.offerId) {
+                                toast({ title: 'Please select an offer', variant: 'destructive' });
+                                return;
+                              }
+                              const ruleData = {
+                                pageId: selectedPageId,
+                                offerId: editingRoutingRule.offerId,
+                                priority: editingRoutingRule.priority || 0,
+                                conditions: editingRoutingRule.conditions || {},
+                                isFallback: false,
+                                isActive: true,
+                              };
+                              if (editingRoutingRule.id) {
+                                updateRoutingRuleMutation.mutate({ id: editingRoutingRule.id, data: ruleData });
+                              } else {
+                                createRoutingRuleMutation.mutate(ruleData);
+                              }
+                            }}
+                            data-testid="button-save-routing-rule"
+                          >
+                            {editingRoutingRule?.id ? 'Update Rule' : 'Create Rule'}
+                          </Button>
+                          <Button variant="outline" onClick={() => {
+                            setShowRoutingRuleDialog(false);
+                            setEditingRoutingRule(null);
+                          }}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="space-y-3">
+                  {routingRules.map((rule: any, index: number) => {
+                    const ruleOffer = offers.find((o: any) => o.id === rule.offerId);
+                    const conditions = rule.conditions || {};
+                    const hasConditions = conditions.trafficSource || conditions.device || conditions.intentLevel || conditions.returning;
+                    
+                    return (
+                      <Card key={rule.id} className="p-4" data-testid={`card-routing-rule-${index}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline">Priority: {rule.priority}</Badge>
+                              {rule.isFallback && <Badge>Fallback</Badge>}
+                              {!rule.isActive && <Badge variant="destructive">Inactive</Badge>}
+                            </div>
+                            <h4 className="font-semibold mb-1">
+                              Show: {ruleOffer?.title || 'Unknown Offer'}
+                            </h4>
+                            {hasConditions && (
+                              <div className="text-sm text-muted-foreground space-y-1">
+                                {conditions.trafficSource && (
+                                  <p>📱 Traffic: {conditions.trafficSource.join(', ')}</p>
+                                )}
+                                {conditions.device && (
+                                  <p>💻 Devices: {conditions.device.join(', ')}</p>
+                                )}
+                                {conditions.intentLevel && (
+                                  <p>🎯 Intent: {conditions.intentLevel.join(', ')}</p>
+                                )}
+                                {conditions.returning && (
+                                  <p>🔄 Returning visitors only</p>
+                                )}
+                              </div>
+                            )}
+                            {!hasConditions && (
+                              <p className="text-sm text-muted-foreground">No conditions (matches all visitors)</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingRoutingRule(rule);
+                                setShowRoutingRuleDialog(true);
+                              }}
+                              data-testid={`button-edit-routing-rule-${index}`}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteRoutingRuleMutation.mutate(rule.id)}
+                              data-testid={`button-delete-routing-rule-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  {routingRules.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-12">
+                      No routing rules yet. Create your first rule to show targeted offers!
+                    </p>
+                  )}
                 </div>
               </TabsContent>
 
