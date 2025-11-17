@@ -29,6 +29,7 @@ import {
   visitorSessions,
   visitorEvents,
   offerPerformance,
+  offerViewTracking,
 } from "@shared/schema";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
@@ -513,6 +514,59 @@ export class DbStorage implements IStorage {
       byTrafficSource,
       byDevice
     };
+  }
+
+  // Offer View Tracking (for behavioral triggers)
+  async incrementOfferViewCount(sessionId: string, offerId: string): Promise<number> {
+    // Use upsert: if record exists, increment viewCount and update lastViewAt
+    // If not, create new record with viewCount = 1
+    const result = await db
+      .insert(offerViewTracking)
+      .values({
+        sessionId,
+        offerId,
+        viewCount: 1,
+        firstViewAt: new Date(),
+        lastViewAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [offerViewTracking.sessionId, offerViewTracking.offerId],
+        set: {
+          viewCount: sql`${offerViewTracking.viewCount} + 1`,
+          lastViewAt: new Date(),
+        },
+      })
+      .returning();
+    
+    return result[0].viewCount;
+  }
+
+  async getOfferViewCount(sessionId: string, offerId: string): Promise<number> {
+    const result = await db
+      .select()
+      .from(offerViewTracking)
+      .where(
+        and(
+          eq(offerViewTracking.sessionId, sessionId),
+          eq(offerViewTracking.offerId, offerId)
+        )
+      );
+    
+    return result[0]?.viewCount || 0;
+  }
+
+  async getOfferViewCounts(sessionId: string): Promise<Map<string, number>> {
+    const results = await db
+      .select()
+      .from(offerViewTracking)
+      .where(eq(offerViewTracking.sessionId, sessionId));
+    
+    const counts = new Map<string, number>();
+    results.forEach(row => {
+      counts.set(row.offerId, row.viewCount);
+    });
+    
+    return counts;
   }
 }
 
