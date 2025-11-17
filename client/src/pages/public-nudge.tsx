@@ -657,6 +657,13 @@ export default function PublicNudgePage() {
         eventType: 'offer_view',
         meta: { offerId: panelOffer.id, source: 'panel' },
       });
+      
+      // Also increment view count for behavioral triggers
+      fetch('/api/track/offer-view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, offerId: panelOffer.id }),
+      }).catch(err => console.error('Failed to track offer view:', err));
     }
   }, [panelOffer?.id, sessionId]);
 

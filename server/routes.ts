@@ -600,6 +600,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/track/offer-view - Increment offer view count for behavioral triggers
+  app.post("/api/track/offer-view", async (req, res) => {
+    try {
+      const { sessionId, offerId } = req.body;
+      
+      if (!sessionId || !offerId) {
+        return res.status(400).json({ error: "sessionId and offerId required" });
+      }
+      
+      const viewCount = await storage.incrementOfferViewCount(sessionId, offerId);
+      
+      return res.json({ viewCount });
+    } catch (error) {
+      console.error("Offer view tracking error:", error);
+      return res.status(400).json({ error: "Failed to track offer view" });
+    }
+  });
+
   // ===== OFFER PERFORMANCE ANALYTICS =====
   
   // GET /api/analytics/offers/:pageId - Get offer performance metrics
