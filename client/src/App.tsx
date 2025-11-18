@@ -7,7 +7,9 @@ import NotFound from "@/pages/not-found";
 import DashboardPage from "@/pages/dashboard";
 import PageBuilderPage from "@/pages/page-builder";
 import PublicNudgePage from "@/pages/public-nudge";
-import { LayoutDashboard, Sparkles, Pencil } from "lucide-react";
+import FeedbackPage from "@/pages/feedback";
+import PricingPage from "@/pages/pricing";
+import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard } from "lucide-react";
 
 function Navigation() {
   const [location] = useLocation();
@@ -20,6 +22,8 @@ function Navigation() {
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/builder", label: "Page Builder", icon: Pencil },
+    { path: "/pricing", label: "Pricing", icon: CreditCard },
+    { path: "/feedback", label: "Feedback", icon: MessageSquare },
   ];
 
   return (
@@ -71,6 +75,8 @@ function Router() {
       <Switch>
         <Route path="/" component={DashboardPage} />
         <Route path="/builder" component={PageBuilderPage} />
+        <Route path="/pricing" component={PricingPage} />
+        <Route path="/feedback" component={FeedbackPage} />
         <Route path="/n/:slug" component={PublicNudgePage} />
         <Route component={NotFound} />
       </Switch>
