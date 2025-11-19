@@ -122,10 +122,11 @@ export default function PricingPage() {
                 </ul>
 
                 <Button
+                  variant={plan.popular ? "default" : "outline"}
                   className={`w-full ${
                     plan.popular
                       ? "gradient-primary text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-                      : "bg-background border-2 border-purple-500/30 hover:border-purple-500 hover:bg-purple-500/10"
+                      : ""
                   }`}
                   size="lg"
                   data-testid={`button-select-${plan.name.toLowerCase()}`}
