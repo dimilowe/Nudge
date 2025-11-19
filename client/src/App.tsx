@@ -47,7 +47,7 @@ function Navigation() {
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all font-medium ${
                     isActive 
                       ? "gradient-primary text-white shadow-lg shadow-purple-500/30" 
-                      : "text-foreground bg-muted/30 hover:bg-muted hover:shadow-md"
+                      : "text-foreground/90 bg-secondary/50 hover:bg-secondary hover:shadow-md border border-border/50"
                   }`}
                   data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
                 >
