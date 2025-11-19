@@ -558,7 +558,7 @@ function OffersCarousel({ offers, onOfferClick }: { offers: any[]; onOfferClick:
   );
 }
 
-export default function PublicNudgePage() {
+export default function PublicNudgPage() {
   const [, params] = useRoute('/n/:slug');
   const slug = params?.slug || '';
   
@@ -1025,7 +1025,7 @@ export default function PublicNudgePage() {
               });
             }
           }}
-          title={panelOffer ? "Smart Pick For You" : "Nudge"}
+          title={panelOffer ? "Smart Pick For You" : "Nudg"}
         >
           <OfferDeck
             offers={offers}

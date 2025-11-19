@@ -36,8 +36,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import type { NudgePageFormData, OfferFormData } from '@shared/schema';
-import { nudgePageFormSchema, offerFormSchema, automationFormSchema } from '@shared/schema';
+import type { NudgPageFormData, OfferFormData } from '@shared/schema';
+import { nudgPageFormSchema, offerFormSchema, automationFormSchema } from '@shared/schema';
 import type { z } from 'zod';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -119,7 +119,7 @@ export default function PageBuilderPage() {
 
   // Create page mutation
   const createPageMutation = useMutation({
-    mutationFn: async (data: NudgePageFormData & { creatorId: string }) => {
+    mutationFn: async (data: NudgPageFormData & { creatorId: string }) => {
       return await apiRequest('POST', '/api/pages', data);
     },
     onSuccess: () => {
@@ -429,8 +429,8 @@ export default function PageBuilderPage() {
   };
 
   // New page form
-  const pageForm = useForm<NudgePageFormData & { creatorId: string }>({
-    resolver: zodResolver(nudgePageFormSchema.extend({ creatorId: nudgePageFormSchema.shape.creatorId })),
+  const pageForm = useForm<NudgPageFormData & { creatorId: string }>({
+    resolver: zodResolver(nudgPageFormSchema.extend({ creatorId: nudgPageFormSchema.shape.creatorId })),
     defaultValues: {
       creatorId: '',
       title: '',
@@ -491,7 +491,7 @@ export default function PageBuilderPage() {
     },
   });
 
-  const onCreatePage = (data: NudgePageFormData & { creatorId: string }) => {
+  const onCreatePage = (data: NudgPageFormData & { creatorId: string }) => {
     if (!creator?.id) {
       toast({ title: 'Error: Creator not loaded', variant: 'destructive' });
       return;
@@ -689,7 +689,7 @@ export default function PageBuilderPage() {
       <div className="mb-10">
         <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Page Builder</h1>
         <p className="text-lg text-muted-foreground" data-testid="text-page-description">
-          Create and manage your Nudge pages and offers
+          Create and manage your Nudg pages and offers
         </p>
       </div>
 

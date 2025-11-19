@@ -10,7 +10,7 @@ export default function PricingPage() {
       icon: Sparkles,
       description: "Perfect for getting started",
       features: [
-        "1 Nudge page",
+        "1 Nudg page",
         "Up to 10 offers",
         "Basic analytics",
         "5 automations",
@@ -25,7 +25,7 @@ export default function PricingPage() {
       icon: Zap,
       description: "For growing creators",
       features: [
-        "5 Nudge pages",
+        "5 Nudg pages",
         "Unlimited offers",
         "Advanced analytics",
         "Unlimited automations",
@@ -42,7 +42,7 @@ export default function PricingPage() {
       icon: Crown,
       description: "For power users",
       features: [
-        "Unlimited Nudge pages",
+        "Unlimited Nudg pages",
         "Unlimited offers",
         "Real-time analytics",
         "Unlimited automations",

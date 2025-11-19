@@ -81,7 +81,7 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto p-6 max-w-7xl" data-testid="page-dashboard">
       <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Nudge Dashboard</h1>
+        <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Nudg Dashboard</h1>
         <p className="text-lg text-muted-foreground" data-testid="text-page-description">
           Your conversion intelligence at a glance
         </p>
@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
       {/* Pages List */}
       <Card className="glass-card p-6 hover:shadow-2xl transition-shadow">
-        <h3 className="text-xl font-bold mb-5 text-gradient">Your Nudge Pages</h3>
+        <h3 className="text-xl font-bold mb-5 text-gradient">Your Nudg Pages</h3>
         {pages.length > 0 ? (
           <div className="space-y-3">
             {pages.map((page: any) => (
@@ -250,7 +250,7 @@ export default function DashboardPage() {
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">No pages yet</p>
             <p className="text-sm text-muted-foreground">
-              Create your first Nudge page to start converting visitors
+              Create your first Nudg page to start converting visitors
             </p>
           </div>
         )}

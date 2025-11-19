@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { creators, offerViewTracking } from "@shared/schema";
+import { creators, offerViewTracking, visitorEvents } from "@shared/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -12,7 +12,7 @@ import {
   sessionStartSchema,
   eventTrackSchema,
   routeRequestSchema,
-  nudgePageFormSchema,
+  nudgPageFormSchema,
   offerFormSchema,
   automationFormSchema,
   experimentFormSchema,
@@ -119,7 +119,7 @@ async function evaluateRoutingRules(pageId: string, session: any): Promise<strin
   }
   
   // If no fallback, use page's default offer
-  const page = await storage.getNudgePage(pageId);
+  const page = await storage.getNudgPage(pageId);
   return page?.defaultOfferId || null;
 }
 
@@ -232,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get first page for this creator
-      const pages = await storage.getNudgePagesByCreatorId(creator[0].id);
+      const pages = await storage.getNudgPagesByCreatorId(creator[0].id);
       const page = pages[0] || null;
       
       return res.json({
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "creatorId required" });
       }
       
-      const pages = await storage.getNudgePagesByCreatorId(creatorId);
+      const pages = await storage.getNudgPagesByCreatorId(creatorId);
       return res.json({ pages });
     } catch (error) {
       console.error("Pages fetch error:", error);
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pages/:slug - Get page by slug
   app.get("/api/pages/:slug", async (req, res) => {
     try {
-      const page = await storage.getNudgePageBySlug(req.params.slug);
+      const page = await storage.getNudgPageBySlug(req.params.slug);
       if (!page) {
         return res.status(404).json({ error: "Page not found" });
       }
@@ -280,8 +280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/pages - Create a new page
   app.post("/api/pages", async (req, res) => {
     try {
-      const validated = nudgePageFormSchema.parse(req.body);
-      const page = await storage.createNudgePage(validated);
+      const validated = nudgPageFormSchema.parse(req.body);
+      const page = await storage.createNudgPage(validated);
       return res.json({ page });
     } catch (error) {
       console.error("Page creation error:", error);
@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUT /api/pages/:id - Update a page
   app.put("/api/pages/:id", async (req, res) => {
     try {
-      const page = await storage.updateNudgePage(req.params.id, req.body);
+      const page = await storage.updateNudgPage(req.params.id, req.body);
       if (!page) {
         return res.status(404).json({ error: "Page not found" });
       }
@@ -307,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/pages/:id/content", async (req, res) => {
     try {
       const validated = pageContentUpdateSchema.parse(req.body);
-      const page = await storage.updateNudgePage(req.params.id, validated);
+      const page = await storage.updateNudgPage(req.params.id, validated);
       if (!page) {
         return res.status(404).json({ error: "Page not found" });
       }
@@ -321,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/pages/:id - Delete a page
   app.delete("/api/pages/:id", async (req, res) => {
     try {
-      const success = await storage.deleteNudgePage(req.params.id);
+      const success = await storage.deleteNudgPage(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Page not found" });
       }
@@ -613,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the variant page to return its slug
-      const variantPage = await storage.getNudgePage(variantPageId);
+      const variantPage = await storage.getNudgPage(variantPageId);
       if (!variantPage) {
         return res.status(404).json({ error: "Variant page not found" });
       }
@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = sessionStartSchema.parse(req.body);
       
       // Get the page
-      const page = await storage.getNudgePageBySlug(validated.pageSlug);
+      const page = await storage.getNudgPageBySlug(validated.pageSlug);
       if (!page) {
         return res.status(404).json({ error: "Page not found" });
       }
@@ -969,7 +969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get page
-      const page = await storage.getNudgePageBySlug(validated.pageSlug);
+      const page = await storage.getNudgPageBySlug(validated.pageSlug);
       if (!page) {
         return res.status(404).json({ error: "Page not found" });
       }

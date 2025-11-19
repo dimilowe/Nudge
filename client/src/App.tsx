@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import DashboardPage from "@/pages/dashboard";
 import PageBuilderPage from "@/pages/page-builder";
-import PublicNudgePage from "@/pages/public-nudge";
+import PublicNudgPage from "@/pages/public-nudge";
 import FeedbackPage from "@/pages/feedback";
 import PricingPage from "@/pages/pricing";
 import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard } from "lucide-react";
@@ -34,7 +34,7 @@ function Navigation() {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gradient">
-            Nudge
+            Nudg
           </h1>
         </div>
         <div className="flex gap-2">
@@ -77,7 +77,7 @@ function Router() {
         <Route path="/builder" component={PageBuilderPage} />
         <Route path="/pricing" component={PricingPage} />
         <Route path="/feedback" component={FeedbackPage} />
-        <Route path="/n/:slug" component={PublicNudgePage} />
+        <Route path="/n/:slug" component={PublicNudgPage} />
         <Route component={NotFound} />
       </Switch>
     </>

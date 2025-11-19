@@ -53,7 +53,7 @@ export default function FeedbackPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gradient mb-3">Feedback Form</h1>
           <p className="text-muted-foreground">
-            Help us improve Nudge by sharing your thoughts and suggestions
+            Help us improve Nudg by sharing your thoughts and suggestions
           </p>
         </div>
 

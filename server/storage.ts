@@ -3,8 +3,8 @@ import {
   type InsertUser,
   type Creator,
   type InsertCreator,
-  type NudgePage,
-  type InsertNudgePage,
+  type NudgPage,
+  type InsertNudgPage,
   type Offer,
   type InsertOffer,
   type RoutingRule,
@@ -24,7 +24,7 @@ import { db } from "./db";
 import {
   users,
   creators,
-  nudgePages,
+  nudgPages,
   offers,
   routingRules,
   automations,
@@ -70,13 +70,13 @@ export interface IStorage {
   createCreator(creator: InsertCreator): Promise<Creator>;
   updateCreator(id: string, updates: Partial<InsertCreator>): Promise<Creator | undefined>;
 
-  // Nudge Pages
-  getNudgePage(id: string): Promise<NudgePage | undefined>;
-  getNudgePageBySlug(slug: string): Promise<NudgePage | undefined>;
-  getNudgePagesByCreatorId(creatorId: string): Promise<NudgePage[]>;
-  createNudgePage(page: InsertNudgePage): Promise<NudgePage>;
-  updateNudgePage(id: string, updates: Partial<InsertNudgePage>): Promise<NudgePage | undefined>;
-  deleteNudgePage(id: string): Promise<boolean>;
+  // Nudg Pages
+  getNudgPage(id: string): Promise<NudgPage | undefined>;
+  getNudgPageBySlug(slug: string): Promise<NudgPage | undefined>;
+  getNudgPagesByCreatorId(creatorId: string): Promise<NudgPage[]>;
+  createNudgPage(page: InsertNudgPage): Promise<NudgPage>;
+  updateNudgPage(id: string, updates: Partial<InsertNudgPage>): Promise<NudgPage | undefined>;
+  deleteNudgPage(id: string): Promise<boolean>;
 
   // Offers
   getOffer(id: string): Promise<Offer | undefined>;
@@ -174,41 +174,41 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  // Nudge Pages
-  async getNudgePage(id: string): Promise<NudgePage | undefined> {
-    const result = await db.select().from(nudgePages).where(eq(nudgePages.id, id));
+  // Nudg Pages
+  async getNudgPage(id: string): Promise<NudgPage | undefined> {
+    const result = await db.select().from(nudgPages).where(eq(nudgPages.id, id));
     return result[0];
   }
 
-  async getNudgePageBySlug(slug: string): Promise<NudgePage | undefined> {
-    const result = await db.select().from(nudgePages).where(eq(nudgePages.slug, slug));
+  async getNudgPageBySlug(slug: string): Promise<NudgPage | undefined> {
+    const result = await db.select().from(nudgPages).where(eq(nudgPages.slug, slug));
     return result[0];
   }
 
-  async getNudgePagesByCreatorId(creatorId: string): Promise<NudgePage[]> {
+  async getNudgPagesByCreatorId(creatorId: string): Promise<NudgPage[]> {
     return await db
       .select()
-      .from(nudgePages)
-      .where(eq(nudgePages.creatorId, creatorId))
-      .orderBy(desc(nudgePages.createdAt));
+      .from(nudgPages)
+      .where(eq(nudgPages.creatorId, creatorId))
+      .orderBy(desc(nudgPages.createdAt));
   }
 
-  async createNudgePage(insertPage: InsertNudgePage): Promise<NudgePage> {
-    const result = await db.insert(nudgePages).values(insertPage).returning();
+  async createNudgPage(insertPage: InsertNudgPage): Promise<NudgPage> {
+    const result = await db.insert(nudgPages).values(insertPage).returning();
     return result[0];
   }
 
-  async updateNudgePage(id: string, updates: Partial<InsertNudgePage>): Promise<NudgePage | undefined> {
+  async updateNudgPage(id: string, updates: Partial<InsertNudgPage>): Promise<NudgPage | undefined> {
     const result = await db
-      .update(nudgePages)
+      .update(nudgPages)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(nudgePages.id, id))
+      .where(eq(nudgPages.id, id))
       .returning();
     return result[0];
   }
 
-  async deleteNudgePage(id: string): Promise<boolean> {
-    const result = await db.delete(nudgePages).where(eq(nudgePages.id, id)).returning();
+  async deleteNudgPage(id: string): Promise<boolean> {
+    const result = await db.delete(nudgPages).where(eq(nudgPages.id, id)).returning();
     return result.length > 0;
   }
 

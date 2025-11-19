@@ -21,8 +21,8 @@ export const creators = pgTable("creators", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Nudge Pages (each creator can have multiple pages)
-export const nudgePages = pgTable("nudge_pages", {
+// Nudg Pages (each creator can have multiple pages)
+export const nudgPages = pgTable("nudg_pages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   creatorId: varchar("creator_id").notNull(),
   slug: text("slug").notNull().unique(),
@@ -216,7 +216,7 @@ export const insertCreatorSchema = createInsertSchema(creators).omit({
   createdAt: true,
 });
 
-export const insertNudgePageSchema = createInsertSchema(nudgePages).omit({
+export const insertNudgPageSchema = createInsertSchema(nudgPages).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -311,7 +311,7 @@ export const automationFormSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-export const nudgePageFormSchema = z.object({
+export const nudgPageFormSchema = z.object({
   creatorId: z.string(),
   title: z.string().min(1).max(100),
   description: z.string().optional(),
@@ -358,8 +358,8 @@ export type User = typeof users.$inferSelect;
 export type InsertCreator = z.infer<typeof insertCreatorSchema>;
 export type Creator = typeof creators.$inferSelect;
 
-export type InsertNudgePage = z.infer<typeof insertNudgePageSchema>;
-export type NudgePage = typeof nudgePages.$inferSelect;
+export type InsertNudgPage = z.infer<typeof insertNudgPageSchema>;
+export type NudgPage = typeof nudgPages.$inferSelect;
 
 export type InsertOffer = z.infer<typeof insertOfferSchema>;
 export type Offer = typeof offers.$inferSelect;
@@ -387,7 +387,7 @@ export type EventTrack = z.infer<typeof eventTrackSchema>;
 export type RouteRequest = z.infer<typeof routeRequestSchema>;
 export type OfferFormData = z.infer<typeof offerFormSchema>;
 export type AutomationFormData = z.infer<typeof automationFormSchema>;
-export type NudgePageFormData = z.infer<typeof nudgePageFormSchema>;
+export type NudgPageFormData = z.infer<typeof nudgPageFormSchema>;
 export type ExperimentFormData = z.infer<typeof experimentFormSchema>;
 export type RoutingConditions = z.infer<typeof routingConditionsSchema>;
 export type TriggerConfig = z.infer<typeof triggerConfigSchema>;
