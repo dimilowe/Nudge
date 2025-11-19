@@ -30,7 +30,7 @@ function Navigation() {
 
   return (
     <nav className="glass-card sticky top-0 z-50 border-b">
-      <div className="container mx-auto px-8 py-4 flex items-center">
+      <div className="px-8 py-4 flex items-center gap-6">
         <div className="flex items-center gap-3">
           <div className="gradient-primary p-2 rounded-xl">
             <Sparkles className="h-5 w-5 text-white" />
@@ -39,7 +39,7 @@ function Navigation() {
             Nudg
           </h1>
         </div>
-        <div className="flex-1 flex justify-center gap-2">
+        <div className="flex gap-2">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = location === item.path;
@@ -60,7 +60,7 @@ function Navigation() {
             );
           })}
         </div>
-        <div>
+        <div className="ml-auto">
           <span className="text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             The Conversion Brain for Creators
           </span>
