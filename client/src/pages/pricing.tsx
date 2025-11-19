@@ -126,7 +126,7 @@ export default function PricingPage() {
                   className={`w-full ${
                     plan.popular
                       ? "gradient-primary text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-                      : ""
+                      : "border-2 border-purple-400/50 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 font-semibold hover:shadow-md transition-all"
                   }`}
                   size="lg"
                   data-testid={`button-select-${plan.name.toLowerCase()}`}
