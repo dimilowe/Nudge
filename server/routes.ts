@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { creators, offerViewTracking, visitorEvents } from "@shared/schema";
+import { creators, offerViewTracking, visitorEvents, users } from "@shared/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -217,6 +217,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Image upload error:", error);
       return res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
+  // ===== PROFILE SETTINGS =====
+  
+  // PUT /api/profile/username - Update username
+  app.put("/api/profile/username", async (req, res) => {
+    try {
+      const { username } = req.body;
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+      
+      // Get demo creator for now (in a real app, this would use authenticated user)
+      const creator = await db.select().from(creators).limit(1);
+      if (creator.length === 0) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      // Update creator name
+      const updated = await storage.updateCreator(creator[0].id, { name: username });
+      return res.json({ creator: updated });
+    } catch (error) {
+      console.error("Username update error:", error);
+      return res.status(500).json({ error: "Failed to update username" });
+    }
+  });
+  
+  // PUT /api/profile/password - Update password
+  // WARNING: This is a DEMO implementation only. For production:
+  // 1. Add authentication middleware to verify user identity
+  // 2. Use bcrypt.compare() to verify currentPassword against stored hash
+  // 3. Use bcrypt.hash() to hash newPassword before storing
+  // 4. Never store passwords in plaintext
+  app.put("/api/profile/password", async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current and new password are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      // Get demo creator's user (in a real app, this would use authenticated user from session)
+      const creatorResult = await db.select().from(creators).limit(1);
+      if (creatorResult.length === 0) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      // Get user by creator's userId (not by name, to avoid username change issues)
+      const user = await storage.getUser(creatorResult[0].userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // DEMO ONLY: Verify current password matches stored password
+      // In production: use bcrypt.compare(currentPassword, user.password)
+      if (user.password !== currentPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      
+      // DEMO ONLY: Store password in plaintext
+      // In production: const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.update(users).set({ password: newPassword }).where(eq(users.id, user.id));
+      
+      return res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Password update error:", error);
+      return res.status(500).json({ error: "Failed to update password" });
     }
   });
 
