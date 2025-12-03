@@ -476,10 +476,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/pages", async (req, res) => {
     try {
       const validated = nudgPageFormSchema.parse(req.body);
+      
+      // Check if slug already exists
+      const existingPage = await storage.getNudgPageBySlug(validated.slug);
+      if (existingPage) {
+        return res.status(400).json({ error: `A page with slug "${validated.slug}" already exists. Please choose a different name.` });
+      }
+      
       const page = await storage.createNudgPage(validated);
       return res.json({ page });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Page creation error:", error);
+      if (error?.code === '23505') {
+        return res.status(400).json({ error: "A page with this slug already exists. Please choose a different name." });
+      }
       return res.status(400).json({ error: "Failed to create page" });
     }
   });

@@ -133,8 +133,9 @@ export default function PageBuilderPage() {
       setSlugManuallyEdited(false);
       toast({ title: 'Page created successfully!' });
     },
-    onError: () => {
-      toast({ title: 'Failed to create page', variant: 'destructive' });
+    onError: (error: any) => {
+      const message = error?.message || 'Failed to create page';
+      toast({ title: message, variant: 'destructive' });
     },
   });
 
