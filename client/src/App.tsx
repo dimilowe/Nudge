@@ -10,7 +10,8 @@ import PublicNudgPage from "@/pages/public-nudge";
 import FeedbackPage from "@/pages/feedback";
 import PricingPage from "@/pages/pricing";
 import ProfilePage from "@/pages/profile";
-import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle } from "lucide-react";
+import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function Navigation() {
   const [location] = useLocation();
@@ -60,10 +61,19 @@ function Navigation() {
             );
           })}
         </div>
-        <div className="ml-auto">
-          <span className="text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <div className="ml-auto flex items-center gap-4">
+          <span className="text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent hidden md:block">
             The Conversion Brain for Creators
           </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Log out
+          </Button>
         </div>
       </div>
     </nav>
