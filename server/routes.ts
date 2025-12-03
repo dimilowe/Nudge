@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { creators, offerViewTracking, visitorEvents, users } from "@shared/schema";
+import { creators, offerViewTracking, visitorEvents } from "@shared/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -20,6 +20,7 @@ import {
   pageContentUpdateSchema,
   type RoutingConditions,
 } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 // Helper function to detect traffic source from referrer
 function detectTrafficSource(referrer: string | undefined): string {
@@ -157,6 +158,9 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Setup authentication
+  await setupAuth(app);
+  
   // Serve uploaded images statically
   app.use('/uploads', (req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
@@ -220,24 +224,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== AUTHENTICATION =====
+  
+  // GET /api/auth/user - Get authenticated user info
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+  
   // ===== PROFILE SETTINGS =====
   
-  // PUT /api/profile/username - Update username
-  app.put("/api/profile/username", async (req, res) => {
+  // PUT /api/profile/username - Update username (creator name)
+  app.put("/api/profile/username", isAuthenticated, async (req: any, res) => {
     try {
       const { username } = req.body;
       if (!username || username.trim().length === 0) {
         return res.status(400).json({ error: "Username is required" });
       }
       
-      // Get demo creator for now (in a real app, this would use authenticated user)
-      const creator = await db.select().from(creators).limit(1);
-      if (creator.length === 0) {
-        return res.status(404).json({ error: "Creator not found" });
+      const userId = req.user.claims.sub;
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator profile not found" });
       }
       
-      // Update creator name
-      const updated = await storage.updateCreator(creator[0].id, { name: username });
+      const updated = await storage.updateCreator(creator.id, { name: username });
       return res.json({ creator: updated });
     } catch (error) {
       console.error("Username update error:", error);
@@ -245,74 +262,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // PUT /api/profile/password - Update password
-  // WARNING: This is a DEMO implementation only. For production:
-  // 1. Add authentication middleware to verify user identity
-  // 2. Use bcrypt.compare() to verify currentPassword against stored hash
-  // 3. Use bcrypt.hash() to hash newPassword before storing
-  // 4. Never store passwords in plaintext
-  app.put("/api/profile/password", async (req, res) => {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ error: "Current and new password are required" });
-      }
-      
-      if (newPassword.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
-      }
-      
-      // Get demo creator's user (in a real app, this would use authenticated user from session)
-      const creatorResult = await db.select().from(creators).limit(1);
-      if (creatorResult.length === 0) {
-        return res.status(404).json({ error: "Creator not found" });
-      }
-      
-      // Get user by creator's userId (not by name, to avoid username change issues)
-      const user = await storage.getUser(creatorResult[0].userId);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // DEMO ONLY: Verify current password matches stored password
-      // In production: use bcrypt.compare(currentPassword, user.password)
-      if (user.password !== currentPassword) {
-        return res.status(401).json({ error: "Current password is incorrect" });
-      }
-      
-      // DEMO ONLY: Store password in plaintext
-      // In production: const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await db.update(users).set({ password: newPassword }).where(eq(users.id, user.id));
-      
-      return res.json({ success: true, message: "Password updated successfully" });
-    } catch (error) {
-      console.error("Password update error:", error);
-      return res.status(500).json({ error: "Failed to update password" });
-    }
-  });
-
-  // ===== DEMO DATA =====
+  // ===== CREATOR DATA =====
   
-  // GET /api/demo - Get demo creator and first page for development
-  app.get("/api/demo", async (req, res) => {
+  // GET /api/creator - Get authenticated user's creator profile
+  app.get("/api/creator", isAuthenticated, async (req: any, res) => {
     try {
-      // Get first creator (demo creator)
-      const creator = await db.select().from(creators).limit(1);
-      if (creator.length === 0) {
-        return res.status(404).json({ error: "No creators found" });
+      const userId = req.user.claims.sub;
+      let creator = await storage.getCreatorByUserId(userId);
+      
+      // If no creator profile exists, create one
+      if (!creator) {
+        const user = await storage.getUser(userId);
+        const name = user?.firstName || user?.email?.split('@')[0] || 'Creator';
+        creator = await storage.createCreator({
+          userId,
+          name,
+        });
       }
       
       // Get first page for this creator
-      const pages = await storage.getNudgPagesByCreatorId(creator[0].id);
+      const pages = await storage.getNudgPagesByCreatorId(creator.id);
       const page = pages[0] || null;
       
-      return res.json({
-        creator: creator[0],
-        page,
-      });
+      return res.json({ creator, page });
     } catch (error) {
-      console.error("Demo data fetch error:", error);
-      return res.status(500).json({ error: "Failed to fetch demo data" });
+      console.error("Creator fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch creator" });
     }
   });
 
