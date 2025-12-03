@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not found" });
       }
       
-      res.json({ id: user.id, username: user.username, email: user.email });
+      res.json({ id: user.id, username: user.username });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -386,6 +386,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // ===== CREATOR DATA =====
+  
+  // GET /api/demo - Get demo creator for freemium experience (no auth required)
+  app.get("/api/demo", async (req, res) => {
+    try {
+      // Try to get demo creator first (created by seed)
+      let demoCreator = await storage.getCreatorByUserId('user-demo');
+      
+      // If no demo creator, create one for the sandbox experience
+      if (!demoCreator) {
+        demoCreator = await storage.createCreator({
+          userId: 'user-demo',
+          name: 'Demo Creator',
+          bio: 'Try building your first page!',
+        });
+      }
+      
+      // Get demo creator's pages
+      const pages = await storage.getNudgPagesByCreatorId(demoCreator.id);
+      const page = pages[0] || null;
+      
+      return res.json({ creator: demoCreator, page });
+    } catch (error) {
+      console.error("Demo fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch demo data" });
+    }
+  });
   
   // GET /api/creator - Get authenticated user's creator profile
   app.get("/api/creator", isAuthenticated, async (req, res) => {
