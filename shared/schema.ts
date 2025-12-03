@@ -4,12 +4,11 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Users table for username/password authentication
+// Note: password field stores bcrypt hash, not plaintext
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: varchar("username", { length: 50 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-  email: varchar("email"),
-  createdAt: timestamp("created_at").defaultNow(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(), // Stores bcrypt hash
 });
 
 // Creators table (profile for each creator)

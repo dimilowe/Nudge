@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 function Navigation() {
   const [location] = useLocation();
+  const { logout, isLoggingOut, user } = useAuth();
   
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -26,8 +27,8 @@ function Navigation() {
     { path: "/profile", label: "Profile", icon: UserCircle },
   ];
 
-  const handleLogout = () => {
-    window.location.href = '/api/logout';
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -63,18 +64,27 @@ function Navigation() {
           })}
         </div>
         <div className="ml-auto flex items-center gap-4">
-          <span className="text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent hidden md:block">
-            The Conversion Brain for Creators
-          </span>
+          {user && (
+            <span className="text-sm font-medium text-muted-foreground hidden md:block">
+              {user.username}
+            </span>
+          )}
           <Button
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-foreground"
             onClick={handleLogout}
+            disabled={isLoggingOut}
             data-testid="button-logout"
           >
-            <LogOut className="h-4 w-4 mr-2" />
-            Log out
+            {isLoggingOut ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
+              </>
+            )}
           </Button>
         </div>
       </div>

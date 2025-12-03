@@ -5,7 +5,7 @@ export async function seedNudgeData() {
 
   try {
     // Check if data already exists
-    const existingPages = await storage.getNudgePageBySlug('demo');
+    const existingPages = await storage.getNudgPageBySlug('demo');
     if (existingPages) {
       console.log('✓ Seed data already exists, skipping...');
       return {
@@ -27,7 +27,7 @@ export async function seedNudgeData() {
     console.log('✓ Created demo creator:', creator.id);
 
     // Create demo page
-    const page = await storage.createNudgePage({
+    const page = await storage.createNudgPage({
       creatorId: creator.id,
       slug: 'demo',
       title: 'Welcome to My Page',
@@ -85,7 +85,7 @@ export async function seedNudgeData() {
     console.log('✓ Created 3 offers');
 
     // Update page with default offer
-    await storage.updateNudgePage(page.id, {
+    await storage.updateNudgPage(page.id, {
       defaultOfferId: digitalProduct.id,
     });
 

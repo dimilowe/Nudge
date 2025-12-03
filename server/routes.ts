@@ -274,14 +274,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username already taken" });
       }
       
-      // Hash password
-      const passwordHash = await bcrypt.hash(password, 10);
+      // Hash password with bcrypt
+      const hashedPassword = await bcrypt.hash(password, 10);
       
       // Create user
       const user = await storage.createUser({
         username,
-        passwordHash,
-        email: email || null,
+        password: hashedPassword,
       });
       
       // Create creator profile automatically
@@ -316,8 +315,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid username or password" });
       }
       
-      // Verify password
-      const isValid = await bcrypt.compare(password, user.passwordHash);
+      // Verify password against bcrypt hash
+      const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
