@@ -10,16 +10,13 @@ import PublicNudgPage from "@/pages/public-nudge";
 import FeedbackPage from "@/pages/feedback";
 import PricingPage from "@/pages/pricing";
 import ProfilePage from "@/pages/profile";
-import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut } from "lucide-react";
+import LandingPage from "@/pages/landing";
+import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 function Navigation() {
   const [location] = useLocation();
-  
-  // Don't show navigation on public pages
-  if (location.startsWith('/n/')) {
-    return null;
-  }
   
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -28,6 +25,10 @@ function Navigation() {
     { path: "/feedback", label: "Feedback", icon: MessageSquare },
     { path: "/profile", label: "Profile", icon: UserCircle },
   ];
+
+  const handleLogout = () => {
+    window.location.href = '/api/logout';
+  };
 
   return (
     <nav className="glass-card sticky top-0 z-50 border-b">
@@ -69,6 +70,7 @@ function Navigation() {
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-foreground"
+            onClick={handleLogout}
             data-testid="button-logout"
           >
             <LogOut className="h-4 w-4 mr-2" />
@@ -80,7 +82,7 @@ function Navigation() {
   );
 }
 
-function Router() {
+function AuthenticatedRouter() {
   return (
     <>
       <Navigation />
@@ -95,6 +97,29 @@ function Router() {
       </Switch>
     </>
   );
+}
+
+function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+  
+  if (location.startsWith('/n/')) {
+    return <Route path="/n/:slug" component={PublicNudgPage} />;
+  }
+  
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+  
+  return <AuthenticatedRouter />;
 }
 
 function App() {
