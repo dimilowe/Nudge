@@ -3,26 +3,13 @@ import { pgTable, text, varchar, jsonb, integer, timestamp, boolean, real, index
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// Users table for Replit Auth
+// Users table for username/password authentication
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
+  username: varchar("username", { length: 50 }).notNull().unique(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  email: varchar("email"),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Creators table (profile for each creator)
@@ -36,8 +23,8 @@ export const creators = pgTable("creators", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Nudg Pages (each creator can have multiple pages)
-export const nudgPages = pgTable("nudg_pages", {
+// Nudge Pages (each creator can have multiple pages)
+export const nudgPages = pgTable("nudge_pages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   creatorId: varchar("creator_id").notNull(),
   slug: text("slug").notNull().unique(),
@@ -220,13 +207,22 @@ export const pageThemeSchema = z.object({
   buttonStyle: z.enum(["rounded", "sharp", "pill"]).default("rounded"),
 });
 
-// Upsert user type for Replit Auth
-export type UpsertUser = typeof users.$inferInsert;
-
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
   createdAt: true,
-  updatedAt: true,
+});
+
+// Auth schemas
+export const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(50),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email().optional().or(z.literal("")),
+});
+
+export const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export const insertCreatorSchema = createInsertSchema(creators).omit({
@@ -414,3 +410,5 @@ export type HeroSection = z.infer<typeof heroSectionSchema>;
 export type PageContent = z.infer<typeof pageContentSchema>;
 export type PageTheme = z.infer<typeof pageThemeSchema>;
 export type PageContentUpdate = z.infer<typeof pageContentUpdateSchema>;
+export type RegisterData = z.infer<typeof registerSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
