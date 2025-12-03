@@ -8,9 +8,20 @@ The application consists of:
 3. **Analytics & Tracking** - Visitor session tracking, behavioral event monitoring, and conversion analytics.
 4. **Experiments Platform** - A/B/C split testing with weighted traffic assignment and real-time metrics.
 
-# Recent Changes (November 17, 2025)
+# Recent Changes (December 3, 2025)
 
-## Experiments Feature Implementation
+## Username/Password Authentication
+- Replaced OAuth with simple username/password authentication per user request
+- Users table now has `username` (unique) and `password` (bcrypt hash) fields
+- Auth API routes: /api/auth/register, /api/auth/login, /api/auth/logout, /api/auth/me
+- Session-based authentication using express-session with httpOnly cookies
+- Passwords hashed with bcrypt (10 salt rounds) before database storage
+- Landing page shows login/register forms for unauthenticated users
+- Protected routes accessible only when logged in
+
+## Previous Changes (November 17, 2025)
+
+### Experiments Feature Implementation
 - Added experiments schema with variant tracking (A/B/C), traffic split percentages, target visitors, and status management
 - Implemented comprehensive experiment CRUD storage methods (create, get, getByCreatorId, update, delete)
 - Added experiment API routes with robust traffic split validation:
@@ -19,7 +30,7 @@ The application consists of:
 - Created dedicated trafficSplitSchema with validation ensuring percentages sum to 100 and are within 0-100 bounds
 - Added experimentId and variantIndex to visitorSessions table for tracking experiment participation
 
-## Previous Enhancements
+### Previous Enhancements
 - Hidden offers feature with offer_repeat_view automation trigger
 - Timeframe-aware view tracking with composite unique constraints
 - Image upload system for hero and background images
