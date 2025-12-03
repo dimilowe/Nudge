@@ -11,20 +11,21 @@ import FeedbackPage from "@/pages/feedback";
 import PricingPage from "@/pages/pricing";
 import ProfilePage from "@/pages/profile";
 import LandingPage from "@/pages/landing";
-import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut, Loader2 } from "lucide-react";
+import AuthPage from "@/pages/auth";
+import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut, LogIn, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
 function Navigation() {
   const [location] = useLocation();
-  const { logout, isLoggingOut, user } = useAuth();
+  const { logout, isLoggingOut, user, isAuthenticated } = useAuth();
   
   const navItems = [
-    { path: "/", label: "Dashboard", icon: LayoutDashboard },
-    { path: "/builder", label: "Page Builder", icon: Pencil },
-    { path: "/pricing", label: "Pricing", icon: CreditCard },
-    { path: "/feedback", label: "Feedback", icon: MessageSquare },
-    { path: "/profile", label: "Profile", icon: UserCircle },
+    { path: "/", label: "Home", icon: Sparkles, showAlways: true },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, showAlways: true },
+    { path: "/builder", label: "Page Builder", icon: Pencil, showAlways: true },
+    { path: "/pricing", label: "Pricing", icon: CreditCard, showAlways: true },
+    { path: "/feedback", label: "Feedback", icon: MessageSquare, showAlways: true },
   ];
 
   const handleLogout = async () => {
@@ -34,16 +35,18 @@ function Navigation() {
   return (
     <nav className="glass-card sticky top-0 z-50 border-b">
       <div className="px-8 py-4 flex items-center gap-6">
-        <div className="flex items-center gap-3">
-          <div className="gradient-primary p-2 rounded-xl">
-            <Sparkles className="h-5 w-5 text-white" />
+        <Link href="/">
+          <div className="flex items-center gap-3 cursor-pointer">
+            <div className="gradient-primary p-2 rounded-xl">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gradient">
+              Nudg
+            </h1>
           </div>
-          <h1 className="text-2xl font-bold text-gradient">
-            Nudg
-          </h1>
-        </div>
+        </Link>
         <div className="flex gap-2">
-          {navItems.map(item => {
+          {navItems.filter(item => item.path !== "/").map(item => {
             const Icon = item.icon;
             const isActive = location === item.path;
             return (
@@ -64,72 +67,77 @@ function Navigation() {
           })}
         </div>
         <div className="ml-auto flex items-center gap-4">
-          {user && (
-            <span className="text-sm font-medium text-muted-foreground hidden md:block">
-              {user.username}
-            </span>
+          {isAuthenticated ? (
+            <>
+              {user && (
+                <Link href="/profile">
+                  <span className="text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer hidden md:block">
+                    {user.username}
+                  </span>
+                </Link>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                data-testid="button-logout"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log out
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <Link href="/auth">
+              <Button
+                variant="default"
+                size="sm"
+                className="gradient-primary text-white"
+                data-testid="button-login"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            </Link>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            data-testid="button-logout"
-          >
-            {isLoggingOut ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <LogOut className="h-4 w-4 mr-2" />
-                Log out
-              </>
-            )}
-          </Button>
         </div>
       </div>
     </nav>
   );
 }
 
-function AuthenticatedRouter() {
-  return (
-    <>
-      <Navigation />
-      <Switch>
-        <Route path="/" component={DashboardPage} />
-        <Route path="/builder" component={PageBuilderPage} />
-        <Route path="/pricing" component={PricingPage} />
-        <Route path="/feedback" component={FeedbackPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route path="/n/:slug" component={PublicNudgPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </>
-  );
-}
-
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [location] = useLocation();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-      </div>
-    );
-  }
   
   if (location.startsWith('/n/')) {
     return <Route path="/n/:slug" component={PublicNudgPage} />;
   }
   
-  if (!isAuthenticated) {
-    return <LandingPage />;
-  }
-  
-  return <AuthenticatedRouter />;
+  return (
+    <>
+      <Navigation />
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/builder" component={PageBuilderPage} />
+        <Route path="/pricing" component={PricingPage} />
+        <Route path="/feedback" component={FeedbackPage} />
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/profile">
+          {isAuthenticated ? <ProfilePage /> : <AuthPage />}
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </>
+  );
 }
 
 function App() {
