@@ -697,9 +697,9 @@ export default function PageBuilderPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Pages List */}
-        <Card className="glass-card p-6 lg:col-span-1 hover:shadow-2xl transition-shadow">
+        <Card className="glass-card p-6 lg:col-span-1 hover:shadow-2xl transition-shadow min-h-[400px]">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg font-bold text-gradient">Your Pages</h3>
             <Button 
@@ -714,10 +714,10 @@ export default function PageBuilderPage() {
           </div>
 
           {showNewPageForm && (
-            <Card className="p-4 mb-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200/50">
-              <h4 className="font-bold mb-4 text-gradient">Create New Page</h4>
+            <Card className="p-5 mb-5 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200/50 dark:border-purple-700/50 shadow-lg">
+              <h4 className="text-lg font-bold mb-4 text-gradient">Create New Page</h4>
               <Form {...pageForm}>
-                <form onSubmit={pageForm.handleSubmit(onCreatePage)} className="space-y-3">
+                <form onSubmit={pageForm.handleSubmit(onCreatePage)} className="space-y-4">
                   <FormField
                     control={pageForm.control}
                     name="creatorId"
@@ -823,7 +823,7 @@ export default function PageBuilderPage() {
         </Card>
 
         {/* Page Editor */}
-        <Card className="glass-card p-6 lg:col-span-2 hover:shadow-2xl transition-shadow">
+        <Card className="glass-card p-6 lg:col-span-2 hover:shadow-2xl transition-shadow min-h-[500px]">
           {selectedPage ? (
             <>
               <div className="flex items-center justify-between mb-6">
@@ -2623,11 +2623,21 @@ export default function PageBuilderPage() {
             </Tabs>
             </>
           ) : (
-            <div className="text-center py-24">
-              <p className="text-muted-foreground mb-2">No page selected</p>
-              <p className="text-sm text-muted-foreground">
-                Select a page from the left or create a new one to get started
+            <div className="flex flex-col items-center justify-center py-16 px-8">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 flex items-center justify-center mb-6">
+                <Rocket className="h-10 w-10 text-purple-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">No Page Selected</h3>
+              <p className="text-muted-foreground text-center max-w-md mb-6">
+                Select a page from the left sidebar to start editing, or create a new one to get started with your link-in-bio page.
               </p>
+              <Button 
+                className="gradient-primary text-white shadow-lg shadow-purple-500/30"
+                onClick={() => setShowNewPageForm(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Your First Page
+              </Button>
             </div>
           )}
         </Card>
