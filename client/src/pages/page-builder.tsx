@@ -129,6 +129,8 @@ export default function PageBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pages', creator?.id] });
       setShowNewPageForm(false);
+      pageForm.reset();
+      setSlugManuallyEdited(false);
       toast({ title: 'Page created successfully!' });
     },
     onError: () => {
@@ -452,6 +454,22 @@ export default function PageBuilderPage() {
       });
     }
   }, [creator?.id, pageForm]);
+
+  // Auto-generate slug from title
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const watchedTitle = pageForm.watch('title');
+  
+  useEffect(() => {
+    if (!slugManuallyEdited && watchedTitle) {
+      const generatedSlug = watchedTitle
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+      pageForm.setValue('slug', generatedSlug, { shouldValidate: true });
+    }
+  }, [watchedTitle, slugManuallyEdited, pageForm]);
   
   // Load content when page is selected
   useEffect(() => {
@@ -747,9 +765,17 @@ export default function PageBuilderPage() {
                     name="slug"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Slug</FormLabel>
+                        <FormLabel>Slug <span className="text-xs text-muted-foreground font-normal">(auto-generated from title)</span></FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="my-page" data-testid="input-page-slug" />
+                          <Input 
+                            {...field} 
+                            placeholder="my-page" 
+                            data-testid="input-page-slug"
+                            onChange={(e) => {
+                              setSlugManuallyEdited(true);
+                              field.onChange(e);
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -769,7 +795,11 @@ export default function PageBuilderPage() {
                       type="button" 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setShowNewPageForm(false)}
+                      onClick={() => {
+                        setShowNewPageForm(false);
+                        pageForm.reset();
+                        setSlugManuallyEdited(false);
+                      }}
                     >
                       Cancel
                     </Button>
