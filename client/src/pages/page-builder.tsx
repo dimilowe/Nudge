@@ -861,7 +861,7 @@ export default function PageBuilderPage() {
                         ) : (
                           <>
                             <Lock className="h-5 w-5 text-purple-500" />
-                            Sign Up to Publish
+                            Subscribe to Publish
                           </>
                         )}
                       </DialogTitle>
@@ -869,7 +869,7 @@ export default function PageBuilderPage() {
                         {isAuthenticated ? (
                           "Your page is ready to be published and shared with the world!"
                         ) : (
-                          "Create a free account to publish your page and start getting visitors."
+                          "Choose a plan to unlock publishing and start getting visitors."
                         )}
                       </DialogDescription>
                     </DialogHeader>
@@ -941,9 +941,9 @@ export default function PageBuilderPage() {
                             >
                               Maybe Later
                             </Button>
-                            <Link href="/auth" className="flex-1">
-                              <Button className="w-full gradient-primary text-white" data-testid="button-signup-to-publish">
-                                Sign Up Free
+                            <Link href="/pricing" className="flex-1">
+                              <Button className="w-full gradient-primary text-white" data-testid="button-subscribe-to-publish">
+                                View Plans
                               </Button>
                             </Link>
                           </div>
