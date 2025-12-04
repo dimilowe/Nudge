@@ -145,6 +145,12 @@ export default function PricingPage() {
           </h2>
           <div className="space-y-6">
             <div>
+              <h3 className="font-semibold mb-2">Why Nudg?</h3>
+              <p className="text-muted-foreground text-sm">
+                Nudg is the only link-in-bio platform built for conversions. With AI-powered smart routing, behavioral triggers that display offers at the perfect moment, A/B/C testing to optimize your results, and beautiful glass-morphism design - you'll turn more visitors into customers. Build for free, publish when you're ready.
+              </p>
+            </div>
+            <div>
               <h3 className="font-semibold mb-2">Can I change plans later?</h3>
               <p className="text-muted-foreground text-sm">
                 Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately.
