@@ -1319,7 +1319,10 @@ export default function PageBuilderPage() {
                           name="funnelStage"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Funnel Stage</FormLabel>
+                              <FormLabel>Page Purpose</FormLabel>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Select the type of page you're building
+                              </p>
                               <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                   <SelectTrigger data-testid="select-funnel-stage">
@@ -1327,11 +1330,11 @@ export default function PageBuilderPage() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="lead_capture">Lead Capture</SelectItem>
-                                  <SelectItem value="entry">Entry</SelectItem>
-                                  <SelectItem value="core">Core</SelectItem>
-                                  <SelectItem value="premium">Premium</SelectItem>
-                                  <SelectItem value="upsell">Upsell</SelectItem>
+                                  <SelectItem value="lead_capture">Lead Magnet Page — Collect emails</SelectItem>
+                                  <SelectItem value="entry">Intro Offer Page — Low-cost starter offer</SelectItem>
+                                  <SelectItem value="core">Main Product Page — Your primary offer</SelectItem>
+                                  <SelectItem value="premium">Premium Product Page — Higher-priced option</SelectItem>
+                                  <SelectItem value="upsell">Add-On Offer Page — Optional upsell after purchase</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -1471,7 +1474,10 @@ export default function PageBuilderPage() {
                           name="funnelStage"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Funnel Stage</FormLabel>
+                              <FormLabel>Page Purpose</FormLabel>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Select the type of page you're building
+                              </p>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                   <SelectTrigger data-testid="select-edit-funnel-stage">
@@ -1479,11 +1485,11 @@ export default function PageBuilderPage() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="lead_capture">Lead Capture</SelectItem>
-                                  <SelectItem value="entry">Entry</SelectItem>
-                                  <SelectItem value="core">Core</SelectItem>
-                                  <SelectItem value="premium">Premium</SelectItem>
-                                  <SelectItem value="upsell">Upsell</SelectItem>
+                                  <SelectItem value="lead_capture">Lead Magnet Page — Collect emails</SelectItem>
+                                  <SelectItem value="entry">Intro Offer Page — Low-cost starter offer</SelectItem>
+                                  <SelectItem value="core">Main Product Page — Your primary offer</SelectItem>
+                                  <SelectItem value="premium">Premium Product Page — Higher-priced option</SelectItem>
+                                  <SelectItem value="upsell">Add-On Offer Page — Optional upsell after purchase</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
