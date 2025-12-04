@@ -954,14 +954,16 @@ export default function PageBuilderPage() {
                 </Dialog>
               </div>
               <Tabs defaultValue="content" className="w-full">
-              <TabsList>
-                <TabsTrigger value="content" data-testid="tab-content">Content</TabsTrigger>
-                <TabsTrigger value="offers" data-testid="tab-offers">Offers</TabsTrigger>
-                <TabsTrigger value="rules" data-testid="tab-rules">Routing Rules</TabsTrigger>
-                <TabsTrigger value="automations" data-testid="tab-automations">Automations</TabsTrigger>
-                <TabsTrigger value="experiments" data-testid="tab-experiments">Experiments</TabsTrigger>
-                <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-5 px-5 pb-2">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="content" data-testid="tab-content" className="text-xs md:text-sm">Content</TabsTrigger>
+                  <TabsTrigger value="offers" data-testid="tab-offers" className="text-xs md:text-sm">Offers</TabsTrigger>
+                  <TabsTrigger value="rules" data-testid="tab-rules" className="text-xs md:text-sm whitespace-nowrap">Routing Rules</TabsTrigger>
+                  <TabsTrigger value="automations" data-testid="tab-automations" className="text-xs md:text-sm">Automations</TabsTrigger>
+                  <TabsTrigger value="experiments" data-testid="tab-experiments" className="text-xs md:text-sm">Experiments</TabsTrigger>
+                  <TabsTrigger value="analytics" data-testid="tab-analytics" className="text-xs md:text-sm">Analytics</TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="content" className="mt-4">
                 <div className="space-y-4">
