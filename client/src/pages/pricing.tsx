@@ -151,12 +151,6 @@ export default function PricingPage() {
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Is there a free trial?</h3>
-              <p className="text-muted-foreground text-sm">
-                All plans come with a 14-day free trial. No credit card required to start.
-              </p>
-            </div>
-            <div>
               <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
               <p className="text-muted-foreground text-sm">
                 We accept all major credit cards, PayPal, and ACH transfers for annual plans.
