@@ -16,7 +16,7 @@ export default function PricingPage() {
         "5 automations",
         "Email support",
       ],
-      cta: "Start Free Trial",
+      cta: "Choose Starter",
       popular: false,
     },
     {
@@ -33,7 +33,7 @@ export default function PricingPage() {
         "Priority support",
         "Custom branding",
       ],
-      cta: "Start Free Trial",
+      cta: "Choose Pro",
       popular: true,
     },
     {
@@ -52,7 +52,7 @@ export default function PricingPage() {
         "API access",
         "Custom integrations",
       ],
-      cta: "Start Free Trial",
+      cta: "Choose Elite",
       popular: false,
     },
   ];
