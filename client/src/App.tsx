@@ -34,25 +34,27 @@ function Navigation() {
 
   return (
     <nav className="glass-card sticky top-0 z-50 border-b">
-      <div className="px-8 py-4 flex items-center gap-6">
+      <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
         <Link href="/">
-          <div className="flex items-center gap-3 cursor-pointer">
-            <div className="gradient-primary p-2 rounded-xl">
-              <Sparkles className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-2 cursor-pointer">
+            <div className="gradient-primary p-1.5 md:p-2 rounded-xl">
+              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gradient">
+            <h1 className="text-xl md:text-2xl font-bold text-gradient">
               Nudg
             </h1>
           </div>
         </Link>
-        <div className="flex gap-2">
+        
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex gap-2">
           {navItems.filter(item => item.path !== "/").map(item => {
             const Icon = item.icon;
             const isActive = location === item.path;
             return (
               <Link key={item.path} href={item.path}>
                 <button 
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all font-medium ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm ${
                     isActive 
                       ? "gradient-primary text-white shadow-lg shadow-purple-500/30" 
                       : "hover:bg-muted hover:shadow-md"
@@ -66,12 +68,35 @@ function Navigation() {
             );
           })}
         </div>
-        <div className="ml-auto flex items-center gap-4">
+        
+        {/* Mobile Navigation - Show key items only */}
+        <div className="flex md:hidden gap-1">
+          {navItems.filter(item => ["/pricing", "/feedback"].includes(item.path)).map(item => {
+            const Icon = item.icon;
+            const isActive = location === item.path;
+            return (
+              <Link key={item.path} href={item.path}>
+                <button 
+                  className={`flex items-center gap-1 px-2.5 py-2 rounded-lg transition-all font-medium text-xs ${
+                    isActive 
+                      ? "gradient-primary text-white" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid={`nav-mobile-${item.label.toLowerCase().replace(' ', '-')}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </button>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2 md:gap-4">
           {isAuthenticated ? (
             <>
               {user && (
                 <Link href="/profile">
-                  <span className="text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer hidden md:block">
+                  <span className="text-xs md:text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer hidden sm:block">
                     {user.username}
                   </span>
                 </Link>
@@ -79,7 +104,7 @@ function Navigation() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground text-xs md:text-sm px-2 md:px-3"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
                 data-testid="button-logout"
@@ -88,8 +113,8 @@ function Navigation() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Log out
+                    <LogOut className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Log out</span>
                   </>
                 )}
               </Button>
@@ -99,11 +124,11 @@ function Navigation() {
               <Button
                 variant="default"
                 size="sm"
-                className="gradient-primary text-white"
+                className="gradient-primary text-white text-xs md:text-sm px-3 md:px-4"
                 data-testid="button-login"
               >
-                <LogIn className="h-4 w-4 mr-2" />
-                Sign In
+                <LogIn className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Sign In</span>
               </Button>
             </Link>
           )}
