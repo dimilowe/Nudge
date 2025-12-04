@@ -708,21 +708,21 @@ export default function PageBuilderPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl" data-testid="page-page-builder">
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Page Builder</h1>
-        <p className="text-lg text-muted-foreground" data-testid="text-page-description">
-          Create and manage your Nudg pages and offers
+    <div className="container mx-auto p-6 max-w-6xl" data-testid="page-page-builder">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2 text-gradient" data-testid="text-page-title">Page Builder</h1>
+        <p className="text-muted-foreground" data-testid="text-page-description">
+          Create and manage your Nudge pages and offers
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Pages List */}
-        <Card className="glass-card p-6 lg:col-span-1 hover:shadow-2xl transition-shadow min-h-[400px]">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-bold text-gradient">Your Pages</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Pages List - Left Sidebar */}
+        <Card className="p-5 lg:col-span-4 border shadow-sm min-h-[500px]">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold">Your Pages</h3>
             <Button 
-              className="gradient-primary text-white shadow-lg shadow-purple-500/30"
+              className="gradient-primary text-white"
               size="sm" 
               onClick={() => setShowNewPageForm(!showNewPageForm)}
               data-testid="button-new-page"
@@ -733,8 +733,8 @@ export default function PageBuilderPage() {
           </div>
 
           {showNewPageForm && (
-            <Card className="p-5 mb-5 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200/50 dark:border-purple-700/50 shadow-lg">
-              <h4 className="text-lg font-bold mb-4 text-gradient">Create New Page</h4>
+            <Card className="p-4 mb-4 bg-muted/50 border">
+              <h4 className="text-sm font-semibold mb-3">Create New Page</h4>
               <Form {...pageForm}>
                 <form onSubmit={pageForm.handleSubmit(onCreatePage)} className="space-y-4">
                   <FormField
@@ -810,51 +810,32 @@ export default function PageBuilderPage() {
             </Card>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {pages.map((page: any) => (
-              <div
+              <button
                 key={page.id}
-                className={`relative group rounded-xl transition-all ${
+                onClick={() => setSelectedPageId(page.id)}
+                className={`w-full text-left p-3 rounded-lg transition-all ${
                   selectedPageId === page.id
-                    ? 'gradient-primary text-white shadow-lg shadow-purple-500/30'
-                    : 'bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 hover:shadow-md'
+                    ? 'gradient-primary text-white'
+                    : 'hover:bg-muted'
                 }`}
+                data-testid={`button-page-${page.slug}`}
               >
-                <button
-                  onClick={() => setSelectedPageId(page.id)}
-                  className="w-full text-left p-4 font-medium"
-                  data-testid={`button-page-${page.slug}`}
-                >
-                  <div className="font-bold">{page.title}</div>
-                  <div className="text-sm mt-1 opacity-90">/{page.slug}</div>
-                </button>
-                <a
-                  href={`/n/${page.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className={`absolute top-3 right-3 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
-                    selectedPageId === page.id
-                      ? 'hover:bg-white/20'
-                      : 'hover:bg-purple-100 dark:hover:bg-purple-900/30'
-                  }`}
-                  title="View live page"
-                  data-testid={`link-view-live-${page.slug}`}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
+                <div className="font-medium">{page.title}</div>
+                <div className={`text-sm ${selectedPageId === page.id ? 'opacity-80' : 'text-muted-foreground'}`}>/{page.slug}</div>
+              </button>
             ))}
             {pages.length === 0 && !showNewPageForm && (
-              <p className="text-sm text-muted-foreground text-center py-8">
+              <p className="text-sm text-muted-foreground text-center py-6">
                 No pages yet. Create your first one!
               </p>
             )}
           </div>
         </Card>
 
-        {/* Page Editor */}
-        <Card className="glass-card p-6 lg:col-span-2 hover:shadow-2xl transition-shadow min-h-[500px]">
+        {/* Page Editor - Right Panel */}
+        <Card className="p-5 lg:col-span-8 border shadow-sm min-h-[500px]">
           {selectedPage ? (
             <>
               <div className="flex items-center justify-between mb-6">
@@ -982,19 +963,12 @@ export default function PageBuilderPage() {
                 <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="content" className="mt-6">
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-gradient mb-2">Landing Page Content</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Design your page's hero section that visitors will see first
-                    </p>
-                  </div>
-
+              <TabsContent value="content" className="mt-4">
+                <div className="space-y-4">
                   <div className="grid gap-6 md:grid-cols-2">
                     {/* Content Editor */}
-                    <Card className="p-5 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-900/10 dark:to-blue-900/10 border-purple-200/50">
-                      <h4 className="font-bold mb-4 text-gradient">Edit Content</h4>
+                    <Card className="p-4 border">
+                      <h4 className="font-semibold mb-4">Edit Content</h4>
                       <div className="space-y-4">
                         <div>
                           <label className="text-sm font-medium">Headline</label>
@@ -1238,11 +1212,12 @@ export default function PageBuilderPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="offers" className="mt-6">
+              <TabsContent value="offers" className="mt-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Offers</h3>
+                  <h3 className="font-semibold">Offers</h3>
                   <Button 
-                    size="sm" 
+                    size="sm"
+                    className="gradient-primary text-white"
                     onClick={() => setShowNewOfferForm(!showNewOfferForm)}
                     data-testid="button-new-offer"
                   >
@@ -1602,7 +1577,7 @@ export default function PageBuilderPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="rules" className="mt-6">
+              <TabsContent value="rules" className="mt-4">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="font-semibold text-lg">Smart Routing Rules</h3>
@@ -1868,7 +1843,7 @@ export default function PageBuilderPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="automations" className="mt-6">
+              <TabsContent value="automations" className="mt-4">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="font-semibold text-lg">Behavior Automations</h3>
@@ -2263,7 +2238,7 @@ export default function PageBuilderPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="analytics" className="mt-6">
+              <TabsContent value="analytics" className="mt-4">
                 <div className="space-y-6">
                   <div>
                     <h3 className="font-semibold text-lg mb-1">Offer Performance</h3>
@@ -2371,7 +2346,7 @@ export default function PageBuilderPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="experiments" className="mt-6">
+              <TabsContent value="experiments" className="mt-4">
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
