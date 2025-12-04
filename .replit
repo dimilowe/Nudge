@@ -19,6 +19,10 @@ localPort = 35235
 externalPort = 3002
 
 [[ports]]
+localPort = 37165
+externalPort = 8081
+
+[[ports]]
 localPort = 37759
 externalPort = 8080
 
@@ -66,7 +70,7 @@ externalPort = 3003
 PORT = "5000"
 
 [agent]
-integrations = ["javascript_mem_db:1.0.0"]
+integrations = ["javascript_mem_db:1.0.0", "stripe:1.0.0"]
 
 [workflows]
 runButton = "Project"
