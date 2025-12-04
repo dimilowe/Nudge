@@ -1289,10 +1289,18 @@ export default function PageBuilderPage() {
                           name="href"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Link</FormLabel>
+                              <FormLabel>Product Link</FormLabel>
                               <FormControl>
-                                <Input {...field} type="url" data-testid="input-offer-href" />
+                                <Input 
+                                  {...field} 
+                                  type="url" 
+                                  placeholder="https://gumroad.com/your-product"
+                                  data-testid="input-offer-href" 
+                                />
                               </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Paste the URL where visitors can buy this offer (Gumroad, Shopify, Amazon, etc.)
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1433,10 +1441,18 @@ export default function PageBuilderPage() {
                           name="href"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Link</FormLabel>
+                              <FormLabel>Product Link</FormLabel>
                               <FormControl>
-                                <Input {...field} type="url" data-testid="input-edit-offer-href" />
+                                <Input 
+                                  {...field} 
+                                  type="url" 
+                                  placeholder="https://gumroad.com/your-product"
+                                  data-testid="input-edit-offer-href" 
+                                />
                               </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Paste the URL where visitors can buy this offer (Gumroad, Shopify, Amazon, etc.)
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
