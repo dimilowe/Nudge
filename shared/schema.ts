@@ -9,6 +9,11 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(), // Stores bcrypt hash
+  email: text("email"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionTier: text("subscription_tier"), // 'starter' | 'pro' | 'elite' | null
+  subscriptionStatus: text("subscription_status"), // 'active' | 'canceled' | 'past_due' | null
 });
 
 // Creators table (profile for each creator)
