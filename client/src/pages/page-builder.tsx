@@ -42,6 +42,7 @@ import type { NudgPageFormData, OfferFormData } from '@shared/schema';
 import { nudgPageFormSchema, offerFormSchema, automationFormSchema } from '@shared/schema';
 import type { z } from 'zod';
 import useEmblaCarousel from 'embla-carousel-react';
+import { Reorder } from 'framer-motion';
 
 const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
@@ -119,7 +120,15 @@ export default function PageBuilderPage() {
     enabled: !!selectedPageId,
   });
 
-  const offers = offersData?.offers || [];
+  const serverOffers = offersData?.offers || [];
+  const [localOffers, setLocalOffers] = useState<any[]>([]);
+  
+  // Sync local offers with server data when it changes
+  useEffect(() => {
+    setLocalOffers(serverOffers);
+  }, [JSON.stringify(serverOffers)]);
+  
+  const offers = localOffers;
 
   // Create page mutation
   const createPageMutation = useMutation({
@@ -181,6 +190,29 @@ export default function PageBuilderPage() {
       toast({ title: 'Offer deleted successfully!' });
     },
   });
+
+  // Reorder offers mutation
+  const reorderOffersMutation = useMutation({
+    mutationFn: async (offerIds: string[]) => {
+      return await apiRequest('PUT', '/api/offers/reorder', { offerIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/offers', selectedPageId] });
+    },
+    onError: () => {
+      toast({ title: 'Failed to reorder offers', variant: 'destructive' });
+    },
+  });
+
+  // Handle offer reorder with optimistic update
+  const handleReorder = (newOrder: any[]) => {
+    // Update local state immediately for smooth UX
+    setLocalOffers(newOrder);
+    
+    // Persist to server
+    const offerIds = newOrder.map((offer: any) => offer.id);
+    reorderOffersMutation.mutate(offerIds);
+  };
 
   // Fetch automations for selected page
   const { data: automationsData } = useQuery({
@@ -1483,68 +1515,78 @@ export default function PageBuilderPage() {
                   </Card>
                 )}
 
-                <div className="space-y-3">
-                  {offers.map((offer: any, index: number) => (
-                    <Card key={offer.id} className="p-4" data-testid={`card-offer-${index}`}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <GripVertical className="h-5 w-5 text-muted-foreground mt-1" />
-                          {/* Offer Image Thumbnail */}
-                          {offer.imageUrl && (
-                            <div className="flex-shrink-0">
-                              <img 
-                                src={offer.imageUrl} 
-                                alt={offer.title}
-                                className="w-16 h-16 object-cover rounded-lg border"
-                              />
+                {offers.length > 0 ? (
+                  <Reorder.Group 
+                    axis="y" 
+                    values={offers} 
+                    onReorder={handleReorder}
+                    className="space-y-3"
+                  >
+                    {offers.map((offer: any, index: number) => (
+                      <Reorder.Item 
+                        key={offer.id} 
+                        value={offer}
+                        className="list-none"
+                      >
+                        <Card className="p-4" data-testid={`card-offer-${index}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <GripVertical className="h-5 w-5 text-muted-foreground mt-1 cursor-grab active:cursor-grabbing" />
+                              {offer.imageUrl && (
+                                <div className="flex-shrink-0">
+                                  <img 
+                                    src={offer.imageUrl} 
+                                    alt={offer.title}
+                                    className="w-16 h-16 object-cover rounded-lg border"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-semibold" data-testid={`text-offer-title-${index}`}>
+                                    {offer.title}
+                                  </h4>
+                                  <Badge variant="outline">{offer.type}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">{offer.cta}</p>
+                                <a 
+                                  href={offer.href} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  {offer.href}
+                                </a>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold" data-testid={`text-offer-title-${index}`}>
-                                {offer.title}
-                              </h4>
-                              <Badge variant="outline">{offer.type}</Badge>
-                              <Badge variant="secondary">{offer.funnelStage}</Badge>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditOffer(offer)}
+                                data-testid={`button-edit-offer-${index}`}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteOfferMutation.mutate(offer.id)}
+                                data-testid={`button-delete-offer-${index}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">{offer.cta}</p>
-                            <a 
-                              href={offer.href} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline"
-                            >
-                              {offer.href}
-                            </a>
                           </div>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditOffer(offer)}
-                            data-testid={`button-edit-offer-${index}`}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteOfferMutation.mutate(offer.id)}
-                            data-testid={`button-delete-offer-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                  {offers.length === 0 && !showNewOfferForm && (
-                    <p className="text-sm text-muted-foreground text-center py-12">
-                      No offers yet. Create your first one to start converting visitors!
-                    </p>
-                  )}
-                </div>
+                        </Card>
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
+                ) : !showNewOfferForm ? (
+                  <p className="text-sm text-muted-foreground text-center py-12">
+                    No offers yet. Create your first one to start converting visitors!
+                  </p>
+                ) : null}
               </TabsContent>
 
               <TabsContent value="rules" className="mt-4">

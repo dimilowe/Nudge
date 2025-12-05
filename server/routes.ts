@@ -721,6 +721,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PUT /api/offers/reorder - Reorder offers (update displayOrder)
+  app.put("/api/offers/reorder", async (req, res) => {
+    try {
+      const { offerIds } = req.body;
+      if (!Array.isArray(offerIds)) {
+        return res.status(400).json({ error: "offerIds array required" });
+      }
+      
+      // Update displayOrder for each offer based on array position
+      const updates = offerIds.map((id: string, index: number) => 
+        storage.updateOffer(id, { displayOrder: index })
+      );
+      await Promise.all(updates);
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Offer reorder error:", error);
+      return res.status(500).json({ error: "Failed to reorder offers" });
+    }
+  });
+
   // ===== ROUTING RULES =====
   
   // GET /api/routing-rules - Get rules for a page
