@@ -885,102 +885,46 @@ export default function PageBuilderPage() {
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
-                        {isAuthenticated ? (
-                          <>
-                            <Rocket className="h-5 w-5 text-purple-500" />
-                            Ready to Go Live?
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="h-5 w-5 text-purple-500" />
-                            Subscribe to Publish
-                          </>
-                        )}
+                        <Rocket className="h-5 w-5 text-purple-500" />
+                        Ready to Go Live?
                       </DialogTitle>
                       <DialogDescription>
-                        {isAuthenticated ? (
-                          "Your page is ready to be published and shared with the world!"
-                        ) : (
-                          "Choose a plan to unlock publishing and start getting visitors."
-                        )}
+                        Your page is ready to be published and shared with the world!
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
-                      {isAuthenticated ? (
-                        <>
-                          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                            <p className="text-sm text-green-700 dark:text-green-300">
-                              Your page will be live at: <strong>/n/{selectedPage.slug}</strong>
-                            </p>
-                          </div>
-                          <div className="flex gap-3">
-                            <Button 
-                              variant="outline" 
-                              className="flex-1"
-                              onClick={() => setShowPublishDialog(false)}
-                            >
-                              Cancel
-                            </Button>
-                            <a 
-                              href={`/n/${selectedPage.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1"
-                            >
-                              <Button className="w-full gradient-primary text-white" data-testid="button-view-published">
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                View Live Page
-                              </Button>
-                            </a>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-3">
-                              <div className="p-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                <Rocket className="h-3 w-3 text-purple-600" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">Publish unlimited pages</p>
-                                <p className="text-xs text-muted-foreground">Share your links with the world</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <div className="p-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                <BarChart3 className="h-3 w-3 text-purple-600" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">Track your analytics</p>
-                                <p className="text-xs text-muted-foreground">See who's clicking your links</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <div className="p-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                <Zap className="h-3 w-3 text-purple-600" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">Smart routing & A/B testing</p>
-                                <p className="text-xs text-muted-foreground">Optimize your conversions</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-3 pt-2">
-                            <Button 
-                              variant="outline" 
-                              className="flex-1"
-                              onClick={() => setShowPublishDialog(false)}
-                            >
-                              Maybe Later
-                            </Button>
-                            <Link href="/pricing" className="flex-1">
-                              <Button className="w-full gradient-primary text-white" data-testid="button-subscribe-to-publish">
-                                View Plans
-                              </Button>
-                            </Link>
-                          </div>
-                        </>
-                      )}
+                      {/* BETA: Free for everyone - keeping subscription code for later */}
+                      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <p className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                          <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                          Beta Access - Everything is free during our launch period!
+                        </p>
+                      </div>
+                      <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          Your page will be live at: <strong>/n/{selectedPage.slug}</strong>
+                        </p>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => setShowPublishDialog(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <a 
+                          href={`/n/${selectedPage.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1"
+                        >
+                          <Button className="w-full gradient-primary text-white" data-testid="button-view-published">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View Live Page
+                          </Button>
+                        </a>
+                      </div>
                     </div>
                   </DialogContent>
                 </Dialog>

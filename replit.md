@@ -8,9 +8,16 @@ The application consists of:
 3. **Analytics & Tracking** - Visitor session tracking, behavioral event monitoring, and conversion analytics.
 4. **Experiments Platform** - A/B/C split testing with weighted traffic assignment and real-time metrics.
 
-# Recent Changes (December 3, 2025)
+# Recent Changes (January 28, 2026)
 
-## Username/Password Authentication
+## Beta Mode - Free Access
+- All features are now free during beta launch period
+- Removed subscription gates from publishing flow
+- Pricing page shows beta banner with "everything free" messaging
+- All Stripe integration code preserved for future monetization
+- Drag-and-drop offer reordering with framer-motion Reorder component
+
+## Username/Password Authentication (December 3, 2025)
 - Replaced OAuth with simple username/password authentication per user request
 - Users table now has `username` (unique) and `password` (bcrypt hash) fields
 - Auth API routes: /api/auth/register, /api/auth/login, /api/auth/logout, /api/auth/me

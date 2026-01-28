@@ -114,12 +114,32 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        {/* BETA Banner */}
+        <div className="mb-8 p-4 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 border border-purple-500/30 rounded-xl text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+            <span className="font-bold text-purple-600 dark:text-purple-400">BETA ACCESS</span>
+            <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+          </div>
+          <p className="text-lg font-semibold text-foreground mb-1">
+            Everything is FREE during our beta launch!
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Build, publish, and grow your audience at no cost. Just head back to the builder and start creating!
+          </p>
+          <a href="/builder" className="inline-block mt-3">
+            <Button className="gradient-primary text-white">
+              Start Building Free
+            </Button>
+          </a>
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-bold text-gradient mb-4">
-            Choose Your Plan
+            Future Pricing Plans
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Scale your conversion optimization with flexible pricing that grows with you
+            Here's what our plans will look like after beta. For now, enjoy everything free!
           </p>
         </div>
 
