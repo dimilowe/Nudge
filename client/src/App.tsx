@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import DashboardPage from "@/pages/dashboard";
 import PageBuilderPage from "@/pages/page-builder";
 import PublicNudgPage from "@/pages/public-nudge";
+import ExperimentEntryPage from "@/pages/experiment-entry";
 import FeedbackPage from "@/pages/feedback";
 import PricingPage from "@/pages/pricing";
 import ProfilePage from "@/pages/profile";
@@ -143,7 +144,10 @@ function Router() {
   const [location] = useLocation();
   
   if (location.startsWith('/n/')) {
-    return <Route path="/n/:slug" component={PublicNudgPage} />;
+    return <Route path="/n/:slug"><PublicNudgPage key={location} /></Route>;
+  }
+  if (location.startsWith('/e/')) {
+    return <Route path="/e/:id" component={ExperimentEntryPage} />;
   }
   
   return (

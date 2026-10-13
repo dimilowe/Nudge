@@ -26,6 +26,7 @@ import {
   type RoutingConditions,
 } from "@shared/schema";
 import MemoryStore from "memorystore";
+import { assignExperimentVariant, countExperimentVisitors, summarizeExperimentVariant, type TrafficSplit } from "./services/experiment-utils";
 
 declare module "express-session" {
   interface SessionData {
@@ -40,6 +41,32 @@ const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
     res.status(401).json({ message: "Unauthorized" });
   }
 };
+
+async function canManageExperiment(req: Request, creatorId: string) {
+  const creator = await storage.getCreator(creatorId);
+  return !!creator && creator.userId === (req.session.userId || "user-demo");
+}
+
+async function validateExperimentPages(experiment: {
+  creatorId: string;
+  variantAPageId: string;
+  variantBPageId: string;
+  variantCPageId: string;
+  trafficSplit: unknown;
+}) {
+  const ids = [experiment.variantAPageId, experiment.variantBPageId, experiment.variantCPageId];
+  const split = experiment.trafficSplit as TrafficSplit;
+  const weights = [split.a, split.b, split.c];
+  const activeIds = ids.filter((_, index) => weights[index] > 0);
+  if (activeIds.length < 2 || new Set(activeIds).size !== activeIds.length) {
+    return "Select at least two different pages with a positive traffic share.";
+  }
+  const pages = await Promise.all(ids.map((id) => storage.getNudgPage(id)));
+  if (pages.some((page) => !page || page.creatorId !== experiment.creatorId)) {
+    return "All variants must be existing pages belonging to this creator.";
+  }
+  return null;
+}
 
 // Helper function to detect traffic source from referrer
 function detectTrafficSource(referrer: string | undefined): string {
@@ -870,6 +897,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "creatorId required" });
       }
       
+      if (!(await canManageExperiment(req, creatorId))) {
+        return res.status(403).json({ error: "You cannot view this creator's experiments" });
+      }
       const experiments = await storage.getExperimentsByCreatorId(creatorId);
       return res.json({ experiments });
     } catch (error) {
@@ -882,8 +912,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/experiments", async (req, res) => {
     try {
       const validated = experimentFormSchema.parse(req.body);
+      if (!(await canManageExperiment(req, validated.creatorId))) {
+        return res.status(403).json({ error: "You cannot create tests for this creator" });
+      }
+      const trafficSplit = validated.trafficSplit || { a: 33, b: 33, c: 34 };
+      const pageError = await validateExperimentPages({ ...validated, trafficSplit });
+      if (pageError) return res.status(400).json({ error: pageError });
       const experiment = await storage.createExperiment({
         ...validated,
+        trafficSplit,
         status: 'draft',
       });
       return res.json({ experiment });
@@ -901,12 +938,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!current) {
         return res.status(404).json({ error: "Experiment not found" });
       }
-
-      const updates: any = { ...validated };
+      if (!(await canManageExperiment(req, current.creatorId))) {
+        return res.status(403).json({ error: "You cannot update this experiment" });
+      }
+      if (validated.creatorId && validated.creatorId !== current.creatorId) {
+        return res.status(400).json({ error: "An experiment cannot change owners" });
+      }
+      const configurationFields = ["variantAPageId", "variantBPageId", "variantCPageId", "trafficSplit", "targetVisitors"] as const;
+      if (current.startedAt && configurationFields.some((field) => validated[field] !== undefined)) {
+        return res.status(400).json({ error: "Test settings are locked after starting. Create a new test to change variants or traffic." });
+      }
+      if (validated.status === "draft" && current.status !== "draft" ||
+          current.status === "completed" && validated.status && validated.status !== "completed") {
+        return res.status(400).json({ error: "A finished test cannot be restarted. Create a new test." });
+      }
+      const merged = { ...current, ...validated };
+      const pageError = await validateExperimentPages(merged);
+      if (pageError) return res.status(400).json({ error: pageError });
+      if (validated.winnerId) {
+        const ids = [current.variantAPageId, current.variantBPageId, current.variantCPageId];
+        const split = current.trafficSplit as TrafficSplit;
+        if (!ids.some((id, index) => id === validated.winnerId && [split.a, split.b, split.c][index] > 0)) {
+          return res.status(400).json({ error: "Select an active variant as the winner" });
+        }
+      }
+      const updates: Parameters<typeof storage.updateExperiment>[1] = { ...validated };
+      if (validated.winnerId) updates.status = "completed";
       if (validated.status === "running" && !current.startedAt) {
         updates.startedAt = new Date();
       }
-      if (validated.status === "completed" && !current.completedAt) {
+      if (updates.status === "completed" && !current.completedAt) {
         updates.completedAt = new Date();
       }
 
@@ -924,6 +985,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/experiments/:id - Delete an experiment
   app.delete("/api/experiments/:id", async (req, res) => {
     try {
+      const current = await storage.getExperiment(req.params.id);
+      if (!current) return res.status(404).json({ error: "Experiment not found" });
+      if (!(await canManageExperiment(req, current.creatorId))) {
+        return res.status(403).json({ error: "You cannot delete this experiment" });
+      }
       const success = await storage.deleteExperiment(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Experiment not found" });
@@ -943,11 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Experiment not found" });
       }
       
-      // Check if experiment is active
-      if (experiment.status !== 'running') {
-        return res.status(400).json({ error: "Experiment is not running" });
-      }
-      
+      res.setHeader("Cache-Control", "no-store");
       const visitorKey = String(req.query.visitorKey || "");
       if (visitorKey.length < 8 || visitorKey.length > 200) {
         return res.status(400).json({ error: "A valid visitor key is required" });
@@ -955,25 +1017,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Hash the persistent browser key so repeat visits remain in the same arm.
       const split = experiment.trafficSplit as { a: number; b: number; c: number };
-      let hash = 2166136261;
-      for (let i = 0; i < visitorKey.length; i += 1) {
-        hash ^= visitorKey.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-      }
-      const bucket = (hash >>> 0) % 10000 / 100;
-      let variantIndex = 0;
-      let variantPageId = experiment.variantAPageId;
-      
-      if (bucket < split.a) {
-        variantIndex = 0;
-        variantPageId = experiment.variantAPageId;
-      } else if (bucket < split.a + split.b) {
-        variantIndex = 1;
-        variantPageId = experiment.variantBPageId;
-      } else {
-        variantIndex = 2;
-        variantPageId = experiment.variantCPageId;
-      }
+      const running = experiment.status === "running";
+      const variantIndex = running ? assignExperimentVariant(experiment.id, visitorKey, split) : 0;
+      const variantPageId = running
+        ? [experiment.variantAPageId, experiment.variantBPageId, experiment.variantCPageId][variantIndex]
+        : experiment.winnerId || experiment.variantAPageId;
       
       // Get the variant page to return its slug
       const variantPage = await storage.getNudgPage(variantPageId);
@@ -982,8 +1030,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       return res.json({
-        experimentId: experiment.id,
-        variantIndex,
+        experimentId: running ? experiment.id : null,
+        variantIndex: running ? variantIndex : null,
         variantPageId,
         pageSlug: variantPage.slug,
       });
@@ -999,6 +1047,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const experiment = await storage.getExperiment(req.params.id);
       if (!experiment) {
         return res.status(404).json({ error: "Experiment not found" });
+      }
+      if (!(await canManageExperiment(req, experiment.creatorId))) {
+        return res.status(403).json({ error: "You cannot view this experiment's results" });
       }
       
       // Get all sessions for this experiment
@@ -1018,9 +1069,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const variantBSessions = validSessions.filter(s => s.variantIndex === 1);
       const variantCSessions = validSessions.filter(s => s.variantIndex === 2);
 
-      const visitorKeyFor = (session: any) => session.fingerprint || session.id;
-      const uniqueVisitorCount = (sessions: any[]) =>
-        new Set(sessions.map(visitorKeyFor)).size;
       
       // Batch-fetch all events for all sessions at once
       const allSessionIds = validSessions.map(s => s.id);
@@ -1046,22 +1094,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Group events by sessionId for fast lookup
       const conversionSessionIds = new Set(allEvents.map(e => e.sessionId));
-      const convertedVisitorsByVariant = (sessions: any[]) =>
-        new Set(
-          sessions
-            .filter((session) => conversionSessionIds.has(session.id))
-            .map(visitorKeyFor)
-        ).size;
-      
-      // Count conversions per variant
-      const variantAConversions = convertedVisitorsByVariant(variantASessions);
-      const variantBConversions = convertedVisitorsByVariant(variantBSessions);
-      const variantCConversions = convertedVisitorsByVariant(variantCSessions);
-      
-      // Calculate conversion rates
-      const calculateRate = (conversions: number, sessions: number) => {
-        return sessions > 0 ? (conversions / sessions) * 100 : 0;
-      };
       
       return res.json({
         experiment: {
@@ -1069,26 +1101,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: experiment.name,
           status: experiment.status,
           targetVisitors: experiment.targetVisitors,
-          totalVisitors: uniqueVisitorCount(validSessions),
+          totalVisitors: countExperimentVisitors(validSessions),
+          winnerId: experiment.winnerId,
         },
         variants: {
           a: {
             pageId: experiment.variantAPageId,
-            visitors: uniqueVisitorCount(variantASessions),
-            conversions: variantAConversions,
-            conversionRate: calculateRate(variantAConversions, variantASessions.length),
+            ...summarizeExperimentVariant(variantASessions, conversionSessionIds),
           },
           b: {
             pageId: experiment.variantBPageId,
-            visitors: uniqueVisitorCount(variantBSessions),
-            conversions: variantBConversions,
-            conversionRate: calculateRate(variantBConversions, variantBSessions.length),
+            ...summarizeExperimentVariant(variantBSessions, conversionSessionIds),
           },
           c: {
             pageId: experiment.variantCPageId,
-            visitors: uniqueVisitorCount(variantCSessions),
-            conversions: variantCConversions,
-            conversionRate: calculateRate(variantCConversions, variantCSessions.length),
+            ...summarizeExperimentVariant(variantCSessions, conversionSessionIds),
           },
         },
       });
@@ -1111,6 +1138,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Page not found" });
       }
       
+      let experimentId: string | null = null;
+      let variantIndex: number | null = null;
+      if (validated.experimentId) {
+        const experiment = await storage.getExperiment(validated.experimentId);
+        if (experiment?.status === "running" && validated.fingerprint && validated.variantIndex !== undefined) {
+          const assignedIndex = assignExperimentVariant(experiment.id, validated.fingerprint, experiment.trafficSplit as TrafficSplit);
+          const assignedPageId = [experiment.variantAPageId, experiment.variantBPageId, experiment.variantCPageId][assignedIndex];
+          // A shared individual variant URL still works, but cannot misattribute
+          // a different visitor to an arm they were not assigned to.
+          if (assignedIndex === validated.variantIndex && assignedPageId === page.id) {
+            experimentId = experiment.id;
+            variantIndex = assignedIndex;
+          }
+        }
+      }
+
       // Detect traffic source
       const trafficSource = validated.utmSource || detectTrafficSource(validated.referrer);
       
@@ -1127,10 +1170,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         os: validated.os || null,
         intentLevel: 'low', // will be updated as user behaves
         isReturning: false, // TODO: check if fingerprint exists
-        experimentId: validated.experimentId || null,
-        variantIndex: validated.variantIndex !== undefined ? validated.variantIndex : null,
+        experimentId,
+        variantIndex,
       });
-      
+      if (experimentId) {
+        const experiment = await storage.getExperiment(experimentId);
+        const sessions = await storage.getSessionsByExperimentId(experimentId);
+        if (experiment && countExperimentVisitors(sessions) >= experiment.targetVisitors) {
+          await storage.updateExperiment(experimentId, {
+            status: "completed",
+            completedAt: new Date(),
+          });
+        }
+      }
       return res.json({ sessionId: session.id });
     } catch (error) {
       console.error("Session creation error:", error);

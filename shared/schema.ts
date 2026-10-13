@@ -97,7 +97,7 @@ export const experiments = pgTable("experiments", {
   variantCPageId: varchar("variant_c_page_id").notNull(),
   trafficSplit: jsonb("traffic_split").default(sql`'{"a": 33, "b": 33, "c": 34}'`).notNull(), // percentage split for each variant
   targetVisitors: integer("target_visitors").notNull(), // experiment completes after this many visitors
-  status: text("status").default('draft').notNull(), // 'draft' | 'running' | 'completed'
+  status: text("status").default('draft').notNull(), // 'draft' | 'running' | 'paused' | 'completed'
   winnerId: varchar("winner_id"), // pageId of winning variant (set when completed)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   startedAt: timestamp("started_at"),
@@ -280,7 +280,7 @@ export const insertOfferPerformanceSchema = createInsertSchema(offerPerformance)
 // API request schemas
 export const sessionStartSchema = z.object({
   pageSlug: z.string(),
-  fingerprint: z.string().optional(),
+  fingerprint: z.string().min(8).max(200).optional(),
   referrer: z.string().optional(),
   utmSource: z.string().optional(),
   utmMedium: z.string().optional(),
@@ -288,7 +288,7 @@ export const sessionStartSchema = z.object({
   device: z.enum(["mobile", "desktop", "tablet"]),
   os: z.string().optional(),
   experimentId: z.string().optional(), // if visitor is part of an experiment
-  variantIndex: z.number().min(0).max(2).optional(), // 0=A, 1=B, 2=C
+  variantIndex: z.number().int().min(0).max(2).optional(), // 0=A, 1=B, 2=C
 });
 
 export const eventTrackSchema = z.object({
@@ -362,12 +362,13 @@ export const experimentFormSchema = z.object({
   variantBPageId: z.string(),
   variantCPageId: z.string(),
   trafficSplit: trafficSplitSchema.optional(),
-  targetVisitors: z.number().min(10).max(10000),
+  targetVisitors: z.number().int().min(10).max(10000),
 });
 
 export const experimentUpdateSchema = experimentFormSchema.partial().extend({
   trafficSplit: trafficSplitSchema.optional(),
   status: z.enum(["draft", "running", "paused", "completed"]).optional(),
+  winnerId: z.string().optional(),
 });
 
 // Types

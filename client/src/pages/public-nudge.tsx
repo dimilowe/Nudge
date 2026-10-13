@@ -9,6 +9,7 @@ import { X } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import useEmblaCarousel from 'embla-carousel-react';
 import { OverlayPanel } from '@/components/OverlayPanel';
+import { getVisitorId } from '@/lib/visitor-id';
 
 // Detect device type
 function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
@@ -563,6 +564,7 @@ export default function PublicNudgPage() {
   const slug = params?.slug || '';
   
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const sessionRequestRef = useRef<Promise<string> | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [overlayOffer, setOverlayOffer] = useState<any>(null);
   const [panelOffer, setPanelOffer] = useState<any>(null);
@@ -636,18 +638,28 @@ export default function PublicNudgPage() {
 
   // Start session on mount
   useEffect(() => {
-    if (!slug || sessionId) return;
-
-    createSessionMutation.mutate({
+    if (!slug || !page?.id || sessionId || sessionRequestRef.current) return;
+    const query = new URLSearchParams(window.location.search);
+    const experimentId = query.get("experimentId");
+    const rawVariant = query.get("variantIndex");
+    const variantIndex = rawVariant !== null ? Number(rawVariant) : undefined;
+    sessionRequestRef.current = createSessionMutation.mutateAsync({
       pageSlug: slug,
+      fingerprint: getVisitorId(),
+      ...(experimentId && Number.isInteger(variantIndex) && variantIndex! >= 0 && variantIndex! <= 2
+        ? { experimentId, variantIndex } : {}),
       referrer: document.referrer,
+      utmSource: query.get("utm_source") || undefined,
+      utmMedium: query.get("utm_medium") || undefined,
+      utmCampaign: query.get("utm_campaign") || undefined,
       device: getDeviceType(),
       os: navigator.userAgent.includes('Mac') ? 'macos' : 
           navigator.userAgent.includes('Windows') ? 'windows' :
           navigator.userAgent.includes('Android') ? 'android' :
           navigator.userAgent.includes('iOS') ? 'ios' : 'other',
-    });
-  }, [slug, sessionId]);
+    }).then((data) => data.sessionId);
+    sessionRequestRef.current.catch((error) => console.error("Visitor tracking failed:", error));
+  }, [slug, page?.id, sessionId]);
 
   // Track offer view when panel displays an offer
   useEffect(() => {
@@ -793,14 +805,20 @@ export default function PublicNudgPage() {
 
   // Track offer click
   const handleOfferClick = (clickedOffer: any) => {
-    if (sessionId) {
-      trackEventMutation.mutate({
-        sessionId,
-        eventType: 'offer_click',
+    const ready = sessionId ? Promise.resolve(sessionId) : sessionRequestRef.current;
+    ready?.then((id) => fetch("/api/track/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        sessionId: id,
+        eventType: "offer_click",
         meta: { offerId: clickedOffer.id, href: clickedOffer.href },
-      });
-    }
-    window.open(clickedOffer.href, '_blank');
+      }),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Offer click tracking failed");
+    })).catch((error) => console.error(error));
+    window.open(clickedOffer.href, '_blank', 'noopener,noreferrer');
   };
 
   if (!page) {

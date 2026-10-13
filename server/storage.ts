@@ -103,7 +103,7 @@ export interface IStorage {
   getExperiment(id: string): Promise<Experiment | undefined>;
   getExperimentsByCreatorId(creatorId: string): Promise<Experiment[]>;
   createExperiment(experiment: InsertExperiment): Promise<Experiment>;
-  updateExperiment(id: string, updates: Partial<InsertExperiment>): Promise<Experiment | undefined>;
+  updateExperiment(id: string, updates: Partial<InsertExperiment> & { startedAt?: Date; completedAt?: Date }): Promise<Experiment | undefined>;
   deleteExperiment(id: string): Promise<boolean>;
 
   // Visitor Sessions
@@ -329,7 +329,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateExperiment(id: string, updates: Partial<InsertExperiment>): Promise<Experiment | undefined> {
+  async updateExperiment(id: string, updates: Partial<InsertExperiment> & { startedAt?: Date; completedAt?: Date }): Promise<Experiment | undefined> {
     const result = await db
       .update(experiments)
       .set(updates)

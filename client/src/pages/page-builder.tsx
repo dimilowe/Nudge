@@ -43,12 +43,13 @@ import { nudgPageFormSchema, offerFormSchema, automationFormSchema } from '@shar
 import type { z } from 'zod';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Reorder } from 'framer-motion';
+import { ExperimentCard } from '@/components/ExperimentCard';
 
 const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
 export default function PageBuilderPage() {
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: authLoading } = useAuth();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [showNewPageForm, setShowNewPageForm] = useState(false);
   const [showNewOfferForm, setShowNewOfferForm] = useState(false);
@@ -59,7 +60,6 @@ export default function PageBuilderPage() {
   const [editingRoutingRule, setEditingRoutingRule] = useState<any | null>(null);
   const [showExperimentDialog, setShowExperimentDialog] = useState(false);
   const [editingExperiment, setEditingExperiment] = useState<any | null>(null);
-  const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   
   // Experiment form state
@@ -68,9 +68,10 @@ export default function PageBuilderPage() {
   const [variantAPageId, setVariantAPageId] = useState('');
   const [variantBPageId, setVariantBPageId] = useState('');
   const [variantCPageId, setVariantCPageId] = useState('');
-  const [trafficA, setTrafficA] = useState<number>(33);
-  const [trafficB, setTrafficB] = useState<number>(33);
-  const [trafficC, setTrafficC] = useState<number>(34);
+  const [useThirdVariant, setUseThirdVariant] = useState(false);
+  const [trafficA, setTrafficA] = useState<number>(50);
+  const [trafficB, setTrafficB] = useState<number>(50);
+  const [trafficC, setTrafficC] = useState<number>(0);
   const [targetVisitors, setTargetVisitors] = useState<number>(1000);
   
   // Content editor state
@@ -85,13 +86,14 @@ export default function PageBuilderPage() {
   // Offer image state
   const [offerImage, setOfferImage] = useState<string | undefined>(undefined);
 
-  // Fetch demo data (creator + page)
+  // Signed-in creators use their own pages; anonymous visitors retain the free demo.
   const { data: demoData } = useQuery({
-    queryKey: ['/api/demo'],
+    queryKey: ['/api/creator', user?.id || 'demo'],
     queryFn: async () => {
-      const res = await fetch('/api/demo');
+      const res = await apiRequest('GET', isAuthenticated ? '/api/creator' : '/api/demo');
       return res.json();
     },
+    enabled: !authLoading,
   });
 
   const creator = demoData?.creator;
@@ -338,10 +340,12 @@ export default function PageBuilderPage() {
     queryKey: ['/api/experiments', creator?.id],
     queryFn: async () => {
       if (!creator?.id) return { experiments: [] };
-      const res = await fetch(`/api/experiments?creatorId=${creator.id}`);
+      const res = await apiRequest('GET', `/api/experiments?creatorId=${creator.id}`);
       return res.json();
     },
     enabled: !!creator?.id,
+    staleTime: 0,
+    refetchInterval: 30000,
   });
 
   const experiments = experimentsData?.experiments || [];
@@ -378,27 +382,6 @@ export default function PageBuilderPage() {
     },
   });
 
-  // Delete experiment mutation
-  const deleteExperimentMutation = useMutation({
-    mutationFn: async (experimentId: string) => {
-      return await apiRequest('DELETE', `/api/experiments/${experimentId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/experiments', creator?.id] });
-      toast({ title: 'Experiment deleted successfully!' });
-    },
-  });
-
-  // Fetch experiment metrics
-  const { data: metricsData } = useQuery({
-    queryKey: ['/api/experiments', selectedExperimentId, 'metrics'],
-    queryFn: async () => {
-      if (!selectedExperimentId) return null;
-      const res = await fetch(`/api/experiments/${selectedExperimentId}/metrics`);
-      return res.json();
-    },
-    enabled: !!selectedExperimentId,
-  });
   
   // Update page content mutation
   const updateContentMutation = useMutation({
@@ -416,8 +399,14 @@ export default function PageBuilderPage() {
 
   // Experiment form submit handler
   const handleSubmitExperiment = () => {
-    if (!creator?.id || !experimentName || !variantAPageId || !variantBPageId || !variantCPageId) {
+    if (!creator?.id || !experimentName || !variantAPageId || !variantBPageId || useThirdVariant && !variantCPageId) {
       toast({ title: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+    const activePages = useThirdVariant
+      ? [variantAPageId, variantBPageId, variantCPageId] : [variantAPageId, variantBPageId];
+    if (new Set(activePages).size !== activePages.length || trafficA <= 0 || trafficB <= 0 || useThirdVariant && trafficC <= 0) {
+      toast({ title: 'Choose different pages with a positive traffic share for each variant', variant: 'destructive' });
       return;
     }
 
@@ -438,7 +427,7 @@ export default function PageBuilderPage() {
       description: experimentDescription || undefined,
       variantAPageId,
       variantBPageId,
-      variantCPageId,
+      variantCPageId: useThirdVariant ? variantCPageId : variantBPageId,
       trafficSplit: { 
         a: Number(trafficA), 
         b: Number(trafficB), 
@@ -461,9 +450,10 @@ export default function PageBuilderPage() {
     setVariantAPageId('');
     setVariantBPageId('');
     setVariantCPageId('');
-    setTrafficA(33);
-    setTrafficB(33);
-    setTrafficC(34);
+    setUseThirdVariant(false);
+    setTrafficA(50);
+    setTrafficB(50);
+    setTrafficC(0);
     setTargetVisitors(1000);
   };
 
@@ -2306,12 +2296,13 @@ export default function PageBuilderPage() {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-bold text-gradient mb-2">A/B/C Testing Experiments</h3>
+                      <h3 className="text-lg font-bold text-gradient mb-2">Landing Page Split Tests</h3>
                       <p className="text-sm text-muted-foreground">
                         Split test different page variations to optimize conversions
                       </p>
                     </div>
                     <Button onClick={() => {
+                      resetExperimentForm();
                       setEditingExperiment(null);
                       setShowExperimentDialog(true);
                     }} data-testid="button-create-experiment">
@@ -2324,93 +2315,20 @@ export default function PageBuilderPage() {
                   {experiments.length > 0 ? (
                     <div className="grid gap-4">
                       {experiments.map((exp: any) => (
-                        <Card key={exp.id} className="p-5 hover:shadow-lg transition-shadow" data-testid={`card-experiment-${exp.id}`}>
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-bold">{exp.name}</h4>
-                                <Badge variant={exp.status === 'running' ? 'default' : exp.status === 'completed' ? 'secondary' : 'outline'}>
-                                  {exp.status}
-                                </Badge>
-                              </div>
-                              {exp.description && (
-                                <p className="text-sm text-muted-foreground">{exp.description}</p>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => setSelectedExperimentId(selectedExperimentId === exp.id ? null : exp.id)}
-                                data-testid={`button-view-metrics-${exp.id}`}
-                              >
-                                <BarChart3 className="w-4 h-4 mr-1" />
-                                {selectedExperimentId === exp.id ? 'Hide' : 'View'} Metrics
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteExperimentMutation.mutate(exp.id)}
-                                data-testid={`button-delete-experiment-${exp.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Traffic Split</p>
-                              <p className="font-medium">
-                                A: {exp.trafficSplit?.a || 33}% | B: {exp.trafficSplit?.b || 33}% | C: {exp.trafficSplit?.c || 34}%
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Target Visitors</p>
-                              <p className="font-medium">{exp.targetVisitors}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Created</p>
-                              <p className="font-medium">{new Date(exp.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-
-                          {/* Metrics Preview */}
-                          {selectedExperimentId === exp.id && metricsData && (
-                            <div className="mt-4 pt-4 border-t">
-                              <h5 className="font-bold mb-3">Conversion Metrics</h5>
-                              <div className="grid grid-cols-3 gap-4">
-                                {['a', 'b', 'c'].map((variant) => {
-                                  const variantData = metricsData.variants[variant];
-                                  return (
-                                    <Card key={variant} className="p-4 bg-gradient-to-br from-purple-50/30 to-blue-50/30 dark:from-purple-900/10 dark:to-blue-900/10">
-                                      <div className="text-xs font-medium text-muted-foreground mb-2">
-                                        Variant {variant.toUpperCase()}
-                                      </div>
-                                      <div className="space-y-2">
-                                        <div>
-                                          <p className="text-xs text-muted-foreground">Visitors</p>
-                                          <p className="text-lg font-bold">{variantData.visitors}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-muted-foreground">Conversions</p>
-                                          <p className="text-lg font-bold">{variantData.conversions}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-muted-foreground">Conv. Rate</p>
-                                          <p className="text-lg font-bold text-gradient">{variantData.conversionRate.toFixed(2)}%</p>
-                                        </div>
-                                      </div>
-                                    </Card>
-                                  );
-                                })}
-                              </div>
-                              <div className="mt-3 text-sm text-muted-foreground">
-                                Total Visitors: {metricsData.experiment.totalVisitors} / {metricsData.experiment.targetVisitors}
-                              </div>
-                            </div>
-                          )}
-                        </Card>
+                        <ExperimentCard key={exp.id} experiment={exp} pages={pages} onEdit={() => {
+                          setEditingExperiment(exp);
+                          setExperimentName(exp.name);
+                          setExperimentDescription(exp.description || '');
+                          setVariantAPageId(exp.variantAPageId);
+                          setVariantBPageId(exp.variantBPageId);
+                          setVariantCPageId(exp.variantCPageId);
+                          setUseThirdVariant(exp.trafficSplit.c > 0);
+                          setTrafficA(exp.trafficSplit.a);
+                          setTrafficB(exp.trafficSplit.b);
+                          setTrafficC(exp.trafficSplit.c);
+                          setTargetVisitors(exp.targetVisitors);
+                          setShowExperimentDialog(true);
+                        }} />
                       ))}
                     </div>
                   ) : (
@@ -2418,9 +2336,10 @@ export default function PageBuilderPage() {
                       <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-3" />
                       <p className="text-muted-foreground mb-2">No experiments yet</p>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Create your first A/B/C test to optimize conversions
+                        Create two pages with different offers or content, then compare their offer click rates using one shared link.
                       </p>
                       <Button onClick={() => {
+                        resetExperimentForm();
                         setEditingExperiment(null);
                         setShowExperimentDialog(true);
                       }} data-testid="button-create-first-experiment">
@@ -2461,7 +2380,17 @@ export default function PageBuilderPage() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <label className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={useThirdVariant} onCheckedChange={(checked) => {
+                            const enabled = checked === true;
+                            setUseThirdVariant(enabled);
+                            setTrafficA(enabled ? 33 : 50);
+                            setTrafficB(enabled ? 33 : 50);
+                            setTrafficC(enabled ? 34 : 0);
+                          }} data-testid="checkbox-third-variant" />
+                          Test a third variation (A/B/C)
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
                             <label className="text-sm font-medium">Variant A Page</label>
                             <Select value={variantAPageId} onValueChange={setVariantAPageId}>
@@ -2494,7 +2423,7 @@ export default function PageBuilderPage() {
                             </Select>
                           </div>
 
-                          <div>
+                          {useThirdVariant && <div>
                             <label className="text-sm font-medium">Variant C Page</label>
                             <Select value={variantCPageId} onValueChange={setVariantCPageId}>
                               <SelectTrigger data-testid="select-variant-c">
@@ -2508,10 +2437,10 @@ export default function PageBuilderPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                          </div>}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                           <div>
                             <label className="text-sm font-medium">Traffic % A</label>
                             <Input 
@@ -2536,7 +2465,7 @@ export default function PageBuilderPage() {
                               data-testid="input-traffic-b" 
                             />
                           </div>
-                          <div>
+                          {useThirdVariant && <div>
                             <label className="text-sm font-medium">Traffic % C</label>
                             <Input 
                               type="number" 
@@ -2547,11 +2476,11 @@ export default function PageBuilderPage() {
                               onChange={(e) => setTrafficC(Number(e.target.value))}
                               data-testid="input-traffic-c" 
                             />
-                          </div>
+                          </div>}
                         </div>
 
                         <div>
-                          <label className="text-sm font-medium">Target Visitors</label>
+                          <label className="text-sm font-medium">Target Unique Visitors</label>
                           <Input 
                             type="number" 
                             placeholder="1000" 
@@ -2562,7 +2491,7 @@ export default function PageBuilderPage() {
                             data-testid="input-target-visitors" 
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Experiment will auto-complete after reaching this many visitors
+                            New test assignments stop at this target. Review the results and choose which page the test link should serve afterward.
                           </p>
                         </div>
 
@@ -2573,7 +2502,7 @@ export default function PageBuilderPage() {
                           }}>
                             Cancel
                           </Button>
-                          <Button onClick={handleSubmitExperiment} data-testid="button-save-experiment">
+                          <Button onClick={handleSubmitExperiment} disabled={createExperimentMutation.isPending || updateExperimentMutation.isPending} data-testid="button-save-experiment">
                             {editingExperiment ? 'Update' : 'Create'} Experiment
                           </Button>
                         </div>
