@@ -883,16 +883,14 @@ export default function PageBuilderPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
-                      {/* BETA: Free for everyone - keeping subscription code for later */}
                       <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                        <p className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-                          <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
-                          Beta Access - Everything is free during our launch period!
+                        <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                          All Access includes page building, offers, routing, automations, split testing, and analytics. Start with a 14-day trial; no card is required upfront.
                         </p>
                       </div>
                       <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          Your page will be live at: <strong>/n/{selectedPage.slug}</strong>
+                          Your published page will be live at: <strong>/n/{selectedPage.slug}</strong>. Published pages remain live if workspace access pauses after a trial.
                         </p>
                       </div>
                       <div className="flex gap-3">

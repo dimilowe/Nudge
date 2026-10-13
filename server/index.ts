@@ -3,7 +3,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedNudgeData } from "./seed/nudge-seed";
 import { runMigrations } from 'stripe-replit-sync';
-import { getStripeSync } from "./stripeClient";
+import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
+import type Stripe from "stripe";
 import { WebhookHandlers } from "./webhookHandlers";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
@@ -11,6 +12,7 @@ import { publishableKeyFromHost } from "@clerk/shared/keys";
 import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from "./middlewares/clerkProxyMiddleware";
 import { attachLocalClerkUser } from "./auth/clerk";
 import { guardCreatorResources } from "./auth/ownership";
+import { guardBilling } from "./billing";
 import { ensureClerkIdentitySchema } from "./services/clerk-accounts";
 
 const app = express();
@@ -33,18 +35,39 @@ async function initStripe() {
 
     console.log('Setting up managed webhook...');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    // Subscribe only to events supported by the sync handler. A wildcard also
+    // delivers portal/configuration events that it cannot process.
+    const enabledEvents: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
+      "checkout.session.completed", "checkout.session.expired",
+      "customer.created", "customer.updated", "customer.deleted",
+      "customer.subscription.created", "customer.subscription.updated",
+      "customer.subscription.deleted", "customer.subscription.trial_will_end",
+      "invoice.created", "invoice.updated", "invoice.paid", "invoice.payment_failed",
+      "product.created", "product.updated", "product.deleted",
+      "price.created", "price.updated", "price.deleted",
+      "payment_method.attached", "payment_method.updated", "payment_method.detached",
+    ];
     const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
       `${webhookBaseUrl}/api/stripe/webhook`,
-      { enabled_events: ['*'], description: 'Managed webhook for Stripe sync' }
+      { enabled_events: enabledEvents, description: 'Managed Nudg billing webhook' }
     );
+    if (webhook.enabled_events.length !== enabledEvents.length ||
+        enabledEvents.some(event => !webhook.enabled_events.includes(event))) {
+      // The sync package's update helper upserts a missing signing secret.
+      // Stripe only returns that secret on creation; update through the SDK so
+      // the existing managed signing-secret record remains untouched.
+      const stripe = await getUncachableStripeClient();
+      await stripe.webhookEndpoints.update(webhook.id, { enabled_events: enabledEvents });
+    }
     console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
 
     console.log('Syncing Stripe data...');
     stripeSync.syncBackfill()
       .then(() => console.log('Stripe data synced'))
-      .catch((err: Error) => console.error('Error syncing Stripe data:', err));
+      .catch(() => console.error('Stripe data sync failed; billing access still uses authoritative Stripe API reads.'));
   } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
+    // Raw Stripe/database errors can contain credentials or webhook secrets.
+    console.error('Failed to initialize Stripe billing.', { name: error instanceof Error ? error.name : "UnknownError" });
   }
 }
 
@@ -93,7 +116,7 @@ app.use(
     ),
   })),
 );
-app.use("/api", attachLocalClerkUser, guardCreatorResources);
+app.use("/api", attachLocalClerkUser, guardBilling, guardCreatorResources);
 
 app.use((req, res, next) => {
   const start = Date.now();

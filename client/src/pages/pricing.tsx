@@ -1,330 +1,382 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Sparkles, Zap, Crown, Loader2 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { useBilling } from "@/hooks/useBilling";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { ArrowRight, Check, CircleAlert, CreditCard, Loader2, LockKeyhole, RefreshCw, Sparkles } from "lucide-react";
 
-interface StripeProduct {
-  id: string;
-  name: string;
-  description: string;
-  metadata: { tier?: string };
-  prices: {
-    id: string;
-    unit_amount: number;
-    currency: string;
-    recurring: { interval: string };
-  }[];
+type BillingAction = "checkout" | "portal" | null;
+
+const capabilities = [
+  "Build and publish Nudg pages",
+  "Create and manage offers",
+  "Route visitors to relevant offers",
+  "Behavior-based automations",
+  "Split-test page variations",
+  "Track performance with analytics",
+];
+
+function formatDate(timestamp: number | null) {
+  if (!timestamp) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(timestamp * 1000));
 }
 
-const planConfig: Record<string, { icon: any; features: string[]; popular: boolean }> = {
-  Starter: {
-    icon: Sparkles,
-    features: [
-      "1 Nudg page",
-      "Up to 10 offers",
-      "Basic analytics",
-      "5 automations",
-      "Email support",
-    ],
-    popular: false,
-  },
-  Pro: {
-    icon: Zap,
-    features: [
-      "5 Nudg pages",
-      "Unlimited offers",
-      "Advanced analytics",
-      "Unlimited automations",
-      "A/B/C testing",
-      "Priority support",
-      "Custom branding",
-    ],
-    popular: true,
-  },
-  Elite: {
-    icon: Crown,
-    features: [
-      "Unlimited Nudg pages",
-      "Unlimited offers",
-      "Real-time analytics",
-      "Unlimited automations",
-      "Advanced A/B/C testing",
-      "Dedicated support",
-      "White-label solution",
-      "API access",
-      "Custom integrations",
-    ],
-    popular: false,
-  },
-};
-
 export default function PricingPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const billing = useBilling();
+  const { data, isLoading, error, refetch } = billing;
   const { toast } = useToast();
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [action, setAction] = useState<BillingAction>(null);
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const checkoutReturned = new URLSearchParams(window.location.search).get("checkout") === "success";
 
-  const { data: productsData, isLoading } = useQuery<{ products: StripeProduct[] }>({
-    queryKey: ["/api/stripe/products"],
-  });
-
-  const checkoutMutation = useMutation({
-    mutationFn: async ({ priceId, planName }: { priceId: string; planName: string }) => {
-      const response = await apiRequest("POST", "/api/stripe/create-checkout", {
-        priceId,
-        planName,
+  useEffect(() => {
+    if (!checkoutReturned || !isAuthenticated || data?.hasAccess) {
+      setCheckoutPending(false);
+      setPollTimedOut(false);
+      return;
+    }
+    setCheckoutPending(true);
+    setPollTimedOut(false);
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      void refetch().then((result) => {
+        if (result.data?.hasAccess) {
+          setCheckoutPending(false);
+          window.clearInterval(timer);
+        }
       });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
+      if (attempts >= 15) {
+        window.clearInterval(timer);
+        setCheckoutPending(false);
+        setPollTimedOut(true);
       }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to start checkout",
-        variant: "destructive",
-      });
-      setLoadingPlan(null);
-    },
-  });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [checkoutReturned, isAuthenticated, data?.hasAccess, refetch]);
 
-  const handleChoosePlan = (priceId: string, planName: string) => {
-    setLoadingPlan(planName);
-    checkoutMutation.mutate({ priceId, planName });
+  const startCheckout = async () => {
+    if (!isAuthenticated) {
+      window.location.href = "/sign-up?redirect_url=%2Fpricing";
+      return;
+    }
+    setAction("checkout");
+    try {
+      const response = await apiRequest("POST", "/api/stripe/create-checkout");
+      const result = await response.json();
+      if (!result.url) throw new Error("Checkout could not be started. Please try again.");
+      window.location.href = result.url;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Checkout could not be started.";
+      toast({ title: "Unable to start checkout", description: message, variant: "destructive" });
+      setAction(null);
+    }
   };
 
-  const products = productsData?.products || [];
-  
-  const orderedPlans = ["Starter", "Pro", "Elite"]
-    .map((name) => products.find((p) => p.name === name))
-    .filter(Boolean) as StripeProduct[];
+  const openPortal = async () => {
+    setAction("portal");
+    try {
+      const response = await apiRequest("POST", "/api/stripe/portal");
+      const result = await response.json();
+      if (!result.url) throw new Error("The billing portal is not available. Please try again.");
+      window.location.href = result.url;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Billing management could not be opened.";
+      toast({ title: "Unable to open billing", description: message, variant: "destructive" });
+      setAction(null);
+    }
+  };
 
-  const fallbackPlans = [
-    { name: "Starter", price: 8, priceId: null },
-    { name: "Pro", price: 15, priceId: null },
-    { name: "Elite", price: 35, priceId: null },
-  ];
-
-  const displayPlans = orderedPlans.length > 0 ? orderedPlans : null;
+  const status = data?.status?.toLowerCase() ?? "";
+  const trialEnd = formatDate(data?.trialEnd ?? null);
+  const periodEnd = formatDate(data?.periodEnd ?? null);
+  const billingLoading = authLoading || (isAuthenticated && isLoading);
+  const workspaceAccess = Boolean(data?.hasAccess);
+   const isTrial = status === "trialing";
+   const locked = isAuthenticated && !billingLoading && !error && !workspaceAccess && data?.trialEligible === false;
+   const requiresRepair = ["past_due", "unpaid", "paused", "incomplete", "trial_expired"].includes(status);
+  const statusLabel: Record<string, string> = {
+    active: "Subscription active",
+    trialing: "14-day trial",
+    past_due: "Payment needs attention",
+    unpaid: "Payment overdue",
+    canceled: "Subscription ended",
+    incomplete: "Checkout not completed",
+    incomplete_expired: "Checkout expired",
+    paused: "Subscription paused",
+     trial_expired: "Trial ended",
+  };
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* BETA Banner */}
-        <div className="mb-8 p-4 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 border border-purple-500/30 rounded-xl text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
-            <span className="font-bold text-purple-600 dark:text-purple-400">BETA ACCESS</span>
-            <span className="inline-block w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+    <main className="min-h-[100dvh] px-4 py-10 sm:px-6 md:py-16">
+      <div className="mx-auto max-w-6xl">
+        <header className="mx-auto mb-10 max-w-3xl text-center md:mb-14">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-purple-300/60 bg-purple-100/70 px-4 py-2 text-sm font-semibold text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
+            <Sparkles className="h-4 w-4" />
+            One plan. Every creator tool.
           </div>
-          <p className="text-lg font-semibold text-foreground mb-1">
-            Everything is FREE during our beta launch!
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Build, publish, and grow your audience at no cost. Just head back to the builder and start creating!
-          </p>
-          <a href="/builder" className="inline-block mt-3">
-            <Button className="gradient-primary text-white">
-              Start Building Free
-            </Button>
-          </a>
-        </div>
-
-        <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-5xl font-bold text-gradient mb-4">
-            Future Pricing Plans
+          <h1 className="mb-5 text-4xl font-bold tracking-tight text-gradient sm:text-5xl md:text-6xl">
+            Make every page work harder.
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Here's what our plans will look like after beta. For now, enjoy everything free!
+          <p className="mx-auto max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+              Get the complete Nudg workspace with a 14-day trial. No card upfront. Add a payment method before your trial ends to continue at $22/month.
           </p>
-        </div>
+        </header>
 
-        <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-12">
-          {isLoading ? (
-            <div className="col-span-3 flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-            </div>
-          ) : displayPlans ? (
-            displayPlans.map((product) => {
-              const config = planConfig[product.name] || { icon: Sparkles, features: [], popular: false };
-              const Icon = config.icon;
-              const price = product.prices[0];
-              const priceAmount = price ? price.unit_amount / 100 : 0;
-
-              return (
-                <Card
-                  key={product.id}
-                  className={`glass-card p-6 md:p-8 relative ${
-                    config.popular
-                      ? "border-purple-500 border-2 shadow-xl shadow-purple-500/20"
-                      : ""
-                  }`}
-                  data-testid={`card-plan-${product.name.toLowerCase()}`}
+        {checkoutReturned && (
+          <section
+            className={`mx-auto mb-7 max-w-4xl rounded-2xl border p-4 sm:p-5 ${
+              workspaceAccess
+                ? "border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30"
+                : "border-purple-300/70 bg-purple-50/80 dark:border-purple-900 dark:bg-purple-950/30"
+            }`}
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              {workspaceAccess ? (
+                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+              ) : checkoutPending ? (
+                <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-purple-700 dark:text-purple-300" />
+              ) : (
+                <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-purple-700 dark:text-purple-300" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {workspaceAccess
+                    ? "Your Nudg workspace is ready."
+                    : checkoutPending
+                      ? "Confirming your subscription…"
+                      : "Your checkout is still being confirmed."}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {workspaceAccess
+                    ? "Your access is confirmed. You can head to your workspace."
+                    : checkoutPending
+                      ? "This usually takes a few seconds. We’ll verify access before unlocking your workspace."
+                      : "We haven’t confirmed access yet. You can retry the check, or contact us if you just completed checkout."}
+                </p>
+              </div>
+              {!workspaceAccess && !checkoutPending && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => {
+                    setPollTimedOut(false);
+                    setCheckoutPending(true);
+                    void refetch().finally(() => {
+                      setCheckoutPending(false);
+                      setPollTimedOut(true);
+                    });
+                  }}
+                  aria-label="Retry subscription confirmation"
                 >
-                  {config.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <span className="gradient-primary px-4 py-1.5 rounded-full text-white text-sm font-semibold shadow-lg">
-                        Most Popular
-                      </span>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {isAuthenticated && error && (
+          <section className="mx-auto mb-7 flex max-w-4xl flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center sm:justify-between" role="alert">
+            <div>
+              <p className="font-semibold">We couldn’t load your billing status.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Your subscription details haven’t changed. Retry to check your access.</p>
+            </div>
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Retry
+            </Button>
+          </section>
+        )}
+
+        <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)] lg:gap-8">
+          <Card className="relative overflow-hidden border-purple-300/70 bg-card p-6 shadow-xl shadow-purple-950/10 dark:border-purple-900 sm:p-9">
+            <div className="absolute inset-x-0 top-0 h-1.5 gradient-primary" />
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-purple-700 dark:text-purple-300">All Access</p>
+                <h2 className="text-2xl font-bold">The full Nudg workspace</h2>
+              </div>
+              <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200">
+                14 days on us
+              </span>
+            </div>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Everything already in Nudg, included in one membership. Try the complete toolkit before your first payment.
+            </p>
+
+            <div className="my-7 flex items-end gap-2 border-b border-border pb-7">
+              <span className="text-5xl font-bold tracking-tight sm:text-6xl">$22</span>
+              <span className="pb-2 text-muted-foreground">USD / month</span>
+            </div>
+
+            <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              {capabilities.map((feature) => (
+                <li key={feature} className="flex items-start gap-3 text-sm">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-8 rounded-xl border border-purple-200/80 bg-purple-50/70 p-4 dark:border-purple-900 dark:bg-purple-950/35">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <CreditCard className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                No payment card required to start
+              </p>
+              <p className="mt-1.5 pl-6 text-sm leading-relaxed text-muted-foreground">
+                Your trial expires unless you add a payment method. If it ends without payment, workspace access pauses; pages you’ve published remain live.
+              </p>
+            </div>
+
+            {billingLoading ? (
+              <div className="mt-7 h-12 animate-pulse rounded-lg bg-muted" aria-label="Loading subscription details" />
+            ) : workspaceAccess ? (
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link href="/dashboard" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg gradient-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90">
+                  Go to workspace <ArrowRight className="h-4 w-4" />
+                </Link>
+                {data?.customerId && (
+                  <Button variant="outline" className="min-h-11 sm:px-5" onClick={openPortal} disabled={action !== null}>
+                    {action === "portal" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                    Manage billing
+                  </Button>
+                )}
+              </div>
+            ) : isAuthenticated ? (
+              <Button className="mt-7 h-12 w-full gradient-primary text-white sm:w-auto sm:min-w-64" onClick={requiresRepair ? openPortal : startCheckout} disabled={action !== null || !!error}>
+                {action ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {requiresRepair ? "Update payment details" : data?.trialEligible === false ? "Continue to $22/month" : "Start my 14-day trial"}
+                {!action && <ArrowRight className="ml-2 h-4 w-4" />}
+              </Button>
+            ) : (
+              <Button className="mt-7 h-12 w-full gradient-primary text-white sm:w-auto sm:min-w-64" onClick={startCheckout}>
+                Start my 14-day trial <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+            {locked && (
+              <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+                {status === "past_due" || status === "unpaid"
+                  ? "Workspace access is paused until your payment is updated. Published pages remain live."
+                  : "Workspace access is paused. Published pages remain live while you reactivate All Access."}
+              </p>
+            )}
+          </Card>
+
+          <aside className="flex flex-col gap-5">
+            <Card className="p-6 sm:p-7">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your account</p>
+              {billingLoading ? (
+                <div className="mt-5 space-y-3" aria-label="Loading account status">
+                  <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-10 w-full animate-pulse rounded bg-muted" />
+                </div>
+              ) : !isAuthenticated ? (
+                <>
+                  <h2 className="mt-3 text-xl font-bold">Ready when you are</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    Create an account to start your trial. Your card details stay out of the signup flow.
+                  </p>
+                </>
+              ) : error ? (
+                <>
+                  <h2 className="mt-3 text-xl font-bold">Status unavailable</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">Retry to see your current access and billing details.</p>
+                </>
+              ) : data?.hasAccess ? (
+                <>
+                  <span className="mt-4 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                    {statusLabel[status] || "All Access enabled"}
+                  </span>
+                  {isTrial && trialEnd && (
+                    <div className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                      <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">Trial ends {trialEnd}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+                        Add a payment method before then to keep workspace access. If the trial expires without payment, your published pages remain live.
+                      </p>
                     </div>
                   )}
-
-                  <div className="text-center mb-6">
-                    <div className={`inline-flex p-3 rounded-xl mb-4 ${
-                      config.popular ? "gradient-primary" : "bg-muted"
-                    }`}>
-                      <Icon className={`h-8 w-8 ${config.popular ? "text-white" : "text-purple-500"}`} />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-2">{product.name}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {product.description || config.features[0]}
+                  {data?.cancelAtPeriodEnd && periodEnd && (
+                    <p className="mt-4 rounded-xl bg-muted/70 p-4 text-sm leading-relaxed text-muted-foreground">
+                      Your subscription is set to end on <strong className="text-foreground">{periodEnd}</strong>. Your workspace remains available until then; published pages remain live afterward.
                     </p>
-                    <div className="flex items-baseline justify-center gap-1 mb-1">
-                      <span className="text-4xl font-bold text-gradient">
-                        ${priceAmount}
-                      </span>
-                      <span className="text-muted-foreground">/month</span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {config.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <div className="mt-0.5">
-                          <Check className="h-5 w-5 text-purple-500 shrink-0" />
-                        </div>
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    variant={config.popular ? "default" : "outline"}
-                    className={`w-full ${
-                      config.popular
-                        ? "gradient-primary text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-                        : "border-2 border-purple-400/50 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 font-semibold hover:shadow-md transition-all"
-                    }`}
-                    size="lg"
-                    disabled={!price || loadingPlan === product.name}
-                    onClick={() => price && handleChoosePlan(price.id, product.name)}
-                    data-testid={`button-select-${product.name.toLowerCase()}`}
-                  >
-                    {loadingPlan === product.name ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Choose {product.name}
-                  </Button>
-                </Card>
-              );
-            })
-          ) : (
-            fallbackPlans.map((plan) => {
-              const config = planConfig[plan.name];
-              const Icon = config.icon;
-
-              return (
-                <Card
-                  key={plan.name}
-                  className={`glass-card p-6 md:p-8 relative ${
-                    config.popular
-                      ? "border-purple-500 border-2 shadow-xl shadow-purple-500/20"
-                      : ""
-                  }`}
-                  data-testid={`card-plan-${plan.name.toLowerCase()}`}
-                >
-                  {config.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <span className="gradient-primary px-4 py-1.5 rounded-full text-white text-sm font-semibold shadow-lg">
-                        Most Popular
-                      </span>
-                    </div>
                   )}
-
-                  <div className="text-center mb-6">
-                    <div className={`inline-flex p-3 rounded-xl mb-4 ${
-                      config.popular ? "gradient-primary" : "bg-muted"
-                    }`}>
-                      <Icon className={`h-8 w-8 ${config.popular ? "text-white" : "text-purple-500"}`} />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {config.features[0]}
+                  {!isTrial && !data?.cancelAtPeriodEnd && periodEnd && (
+                    <p className="mt-4 text-sm text-muted-foreground">Next billing date: <strong className="text-foreground">{periodEnd}</strong></p>
+                  )}
+                  {status === "past_due" && (
+                    <p className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50/70 p-4 text-sm leading-relaxed text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                      Update your payment method in billing management to avoid an interruption to workspace access.
                     </p>
-                    <div className="flex items-baseline justify-center gap-1 mb-1">
-                      <span className="text-4xl font-bold text-gradient">
-                        ${plan.price}
-                      </span>
-                      <span className="text-muted-foreground">/month</span>
-                    </div>
-                  </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className={`mt-4 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${locked ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" : "bg-muted text-muted-foreground"}`}>
+                    {locked ? statusLabel[status] || "Workspace access paused" : "No active subscription"}
+                  </span>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    {status === "past_due" || status === "unpaid"
+                      ? "Update your payment details to restore workspace access. Your published pages remain live."
+                      : data?.trialEligible === false
+                        ? "Your trial isn’t available for this account. Continue to checkout for All Access at $22 USD/month."
+                      : "Start All Access for a 14-day trial. If a trial ends without payment, workspace access pauses while published pages stay live."}
+                  </p>
+                  {locked && data?.customerId && (
+                    <Button variant="outline" className="mt-5 w-full" onClick={openPortal} disabled={action !== null}>
+                      {action === "portal" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                      Manage billing
+                    </Button>
+                  )}
+                </>
+              )}
+            </Card>
 
-                  <ul className="space-y-3 mb-8">
-                    {config.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <div className="mt-0.5">
-                          <Check className="h-5 w-5 text-purple-500 shrink-0" />
-                        </div>
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    variant={config.popular ? "default" : "outline"}
-                    className={`w-full ${
-                      config.popular
-                        ? "gradient-primary text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
-                        : "border-2 border-purple-400/50 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 font-semibold hover:shadow-md transition-all"
-                    }`}
-                    size="lg"
-                    disabled
-                    data-testid={`button-select-${plan.name.toLowerCase()}`}
-                  >
-                    Loading...
-                  </Button>
-                </Card>
-              );
-            })
-          )}
+            <Card className="border-border/70 bg-muted/40 p-6 sm:p-7">
+              <h2 className="font-bold">Straightforward by design</h2>
+              <div className="mt-4 space-y-4 text-sm">
+                <div className="flex gap-3">
+                  <span className="font-mono text-xs text-purple-700 dark:text-purple-300">01</span>
+                  <p className="text-muted-foreground"><strong className="text-foreground">Try everything.</strong> Your 14-day trial includes the complete creator workspace.</p>
+                </div>
+                <div className="flex gap-3">
+                  <span className="font-mono text-xs text-purple-700 dark:text-purple-300">02</span>
+                  <p className="text-muted-foreground"><strong className="text-foreground">No card upfront.</strong> Begin without entering payment details.</p>
+                </div>
+                <div className="flex gap-3">
+                  <span className="font-mono text-xs text-purple-700 dark:text-purple-300">03</span>
+                  <p className="text-muted-foreground"><strong className="text-foreground">Keep your live pages.</strong> Published pages stay online even if workspace access pauses.</p>
+                </div>
+              </div>
+            </Card>
+          </aside>
         </div>
 
-        <div className="glass-card p-6 md:p-8 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold mb-6 text-center">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-semibold mb-2">Why Nudg?</h3>
-              <p className="text-muted-foreground text-sm">
-                Nudg is the only link-in-bio platform built for conversions. With AI-powered smart routing, behavioral triggers that display offers at the perfect moment, A/B/C testing to optimize your results, and beautiful glass-morphism design - you'll turn more visitors into customers. Build for free, publish when you're ready.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Can I change plans later?</h3>
-              <p className="text-muted-foreground text-sm">
-                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
-              <p className="text-muted-foreground text-sm">
-                We accept all major credit cards, PayPal, and ACH transfers for annual plans.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
-              <p className="text-muted-foreground text-sm">
-                Yes, you can cancel your subscription at any time. Your access continues until the end of your billing period.
-              </p>
-            </div>
-          </div>
-        </div>
+        {checkoutReturned && pollTimedOut && !workspaceAccess && (
+          <p className="mx-auto mt-5 max-w-5xl text-center text-sm text-muted-foreground">
+            Still waiting? Retry the status check above. Checkout success alone doesn’t confirm an active subscription.
+          </p>
+        )}
+
+        <footer className="mx-auto mt-10 max-w-5xl border-t border-border/70 pt-5 text-center text-xs text-muted-foreground">
+          $22 USD per month after the 14-day trial. Billing details and subscription changes are available through billing management.
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }

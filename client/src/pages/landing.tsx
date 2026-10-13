@@ -19,15 +19,14 @@ export default function LandingPage() {
           </h1>
           
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Stop losing sales to one-size-fits-all links. Nudg uses AI-powered smart routing 
-            to show the perfect offer to every visitor based on where they came from and how they behave.
+            Stop losing sales to one-size-fits-all links. Use routing rules, timed automations, and page experiments to put the right offer in front of each visitor.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link href="/builder">
+            <Link href="/pricing">
               <Button size="lg" className="gradient-primary text-white text-lg px-8 py-6" data-testid="cta-try-free">
                 <Play className="mr-2 h-5 w-5" />
-                Try the Builder Free
+                Start a 14-Day Trial
               </Button>
             </Link>
             <Link href="/pricing">
@@ -39,7 +38,7 @@ export default function LandingPage() {
           </div>
           
           <p className="text-sm text-muted-foreground">
-            No credit card required. Build your page first, pay when you're ready to publish.
+            No card up front. All Access is $22 USD/month after your 14-day trial.
           </p>
         </div>
       </section>
@@ -108,7 +107,7 @@ export default function LandingPage() {
               <div className="glass-card p-6 rounded-2xl border shadow-2xl">
                 <div className="space-y-4">
                   <div className="h-32 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center">
-                    <span className="text-4xl">🎯</span>
+                    <Target className="h-10 w-10 text-purple-600 dark:text-purple-300" />
                   </div>
                   <h3 className="font-semibold text-lg">Your Best-Selling Offer</h3>
                   <p className="text-sm text-muted-foreground">Automatically shown to high-intent visitors from email campaigns</p>
@@ -131,12 +130,11 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to Boost Your Conversions?</h2>
             <p className="text-muted-foreground mb-8">
-              Build your smart link-in-bio page now. No signup required to start - 
-              only pay when you're ready to go live.
+              Get the complete Nudg workspace for 14 days, with no card required to begin. All Access is $22 USD/month after your trial.
             </p>
-            <Link href="/builder">
+            <Link href="/pricing">
               <Button size="lg" className="gradient-primary text-white text-lg px-8 py-6" data-testid="cta-start-building">
-                Start Building Your Page
+                Start Your Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>

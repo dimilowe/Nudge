@@ -15,6 +15,7 @@ import AuthPage from "@/pages/auth";
 import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircle, LogOut, LogIn, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { WorkspaceAccess } from "@/components/WorkspaceAccess";
 
 function Navigation() {
   const [location] = useLocation();
@@ -165,15 +166,15 @@ function Router() {
       ) : (
       <Switch>
         <Route path="/">{isAuthenticated ? <Redirect to="/dashboard" /> : <LandingPage />}</Route>
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/builder" component={PageBuilderPage} />
+        <Route path="/dashboard"><WorkspaceAccess><DashboardPage /></WorkspaceAccess></Route>
+        <Route path="/builder"><WorkspaceAccess><PageBuilderPage /></WorkspaceAccess></Route>
         <Route path="/pricing" component={PricingPage} />
         <Route path="/feedback" component={FeedbackPage} />
         <Route path="/sign-in/*?"><AuthPage /></Route>
         <Route path="/sign-up/*?"><AuthPage signUp /></Route>
         <Route path="/auth"><Redirect to="/sign-in" /></Route>
         <Route path="/profile">
-          {isAuthenticated ? <ProfilePage /> : <Redirect to="/sign-in" />}
+          <WorkspaceAccess><ProfilePage /></WorkspaceAccess>
         </Route>
         <Route component={NotFound} />
       </Switch>
