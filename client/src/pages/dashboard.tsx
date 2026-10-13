@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
 import { 
   TrendingUp, 
   Users, 
@@ -13,13 +15,15 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  // Fetch demo data (creator + page)
+  const { isAuthenticated, user, isLoading: authLoading } = useAuth();
+  // Signed-in creators see their own pages; signed-out visitors can try the demo.
   const { data: demoData, isLoading: demoLoading } = useQuery({
-    queryKey: ['/api/demo'],
+    queryKey: ['/api/creator', user?.id || 'demo'],
     queryFn: async () => {
-      const res = await fetch('/api/demo');
+      const res = await apiRequest('GET', isAuthenticated ? '/api/creator' : '/api/demo');
       return res.json();
     },
+    enabled: !authLoading,
   });
 
   const creator = demoData?.creator;
@@ -59,7 +63,7 @@ export default function DashboardPage() {
   const analytics = analyticsData?.analytics;
   const offers = offersData?.offers || [];
 
-  const isLoading = demoLoading || pagesLoading || analyticsLoading || offersLoading;
+  const isLoading = authLoading || demoLoading || pagesLoading || analyticsLoading || offersLoading;
 
   if (isLoading) {
     return (

@@ -1,8 +1,7 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
-import session from "express-session";
-import bcrypt from "bcryptjs";
+import { isAuthenticated, registerClerkAuthRoutes, getClerkUserId } from "./auth/clerk";
 import { storage } from "./storage";
 import { db } from "./db";
 import { creators, offerViewTracking, visitorEvents, users } from "@shared/schema";
@@ -21,30 +20,15 @@ import {
   experimentFormSchema,
   experimentUpdateSchema,
   pageContentUpdateSchema,
-  registerSchema,
-  loginSchema,
   type RoutingConditions,
 } from "@shared/schema";
-import MemoryStore from "memorystore";
 import { assignExperimentVariant, countExperimentVisitors, summarizeExperimentVariant, type TrafficSplit } from "./services/experiment-utils";
-
-declare module "express-session" {
-  interface SessionData {
-    userId: string;
-  }
-}
-
-const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-  if (req.session.userId) {
-    next();
-  } else {
-    res.status(401).json({ message: "Unauthorized" });
-  }
-};
 
 async function canManageExperiment(req: Request, creatorId: string) {
   const creator = await storage.getCreator(creatorId);
-  return !!creator && creator.userId === (req.session.userId || "user-demo");
+  // Signed-in but unlinked users cannot fall back to shared demo ownership.
+  const userId = req.userId || (!getClerkUserId(req) ? "user-demo" : null);
+  return !!creator && creator.userId === userId;
 }
 
 async function validateExperimentPages(experiment: {
@@ -204,22 +188,7 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Setup session middleware
-  const SessionStore = MemoryStore(session);
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'nudg-secret-key-change-in-production',
-    resave: false,
-    saveUninitialized: false,
-    store: new SessionStore({
-      checkPeriod: 86400000, // prune expired entries every 24h
-    }),
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: 'lax',
-    },
-  }));
+  registerClerkAuthRoutes(app);
   
   // Serve uploaded images statically
   app.use('/uploads', (req, res, next) => {
@@ -284,128 +253,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== AUTHENTICATION =====
-  
-  // POST /api/auth/register - Register a new user
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const validation = registerSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: validation.error.errors[0].message });
-      }
-      
-      const { username, password, email } = validation.data;
-      
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already taken" });
-      }
-      
-      // Hash password with bcrypt
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Create user
-      const user = await storage.createUser({
-        username,
-        password: hashedPassword,
-      });
-      
-      // Create creator profile automatically
-      await storage.createCreator({
-        userId: user.id,
-        name: username,
-      });
-      
-      // Set session
-      req.session.userId = user.id;
-      
-      res.json({ id: user.id, username: user.username });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
-    }
-  });
-  
-  // POST /api/auth/login - Login user
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const validation = loginSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: validation.error.errors[0].message });
-      }
-      
-      const { username, password } = validation.data;
-      
-      // Find user
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
-      }
-      
-      // Verify password against bcrypt hash
-      const isValid = await bcrypt.compare(password, user.password);
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid username or password" });
-      }
-      
-      // Set session
-      req.session.userId = user.id;
-      
-      res.json({ id: user.id, username: user.username });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Login failed" });
-    }
-  });
-  
-  // POST /api/auth/logout - Logout user
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Logout failed" });
-      }
-      res.clearCookie('connect.sid');
-      res.json({ message: "Logged out successfully" });
-    });
-  });
-  
-  // GET /api/auth/me - Get current user
-  app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
-    try {
-      const user = await storage.getUser(req.session.userId);
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      
-      res.json({ id: user.id, username: user.username });
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-  
   // ===== PROFILE SETTINGS =====
   
   // PUT /api/profile/username - Update creator name
   app.put("/api/profile/username", isAuthenticated, async (req, res) => {
     try {
       const { username } = req.body;
-      if (!username || username.trim().length === 0) {
+      if (typeof username !== "string" || !username.trim() || username.trim().length > 100) {
         return res.status(400).json({ error: "Username is required" });
       }
       
-      const userId = req.session.userId!;
+      const userId = req.userId!;
       const creator = await storage.getCreatorByUserId(userId);
       if (!creator) {
         return res.status(404).json({ error: "Creator profile not found" });
       }
       
-      const updated = await storage.updateCreator(creator.id, { name: username });
+      const updated = await storage.updateCreator(creator.id, { name: username.trim() });
       return res.json({ creator: updated });
     } catch (error) {
       console.error("Username update error:", error);
@@ -508,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/stripe/subscription - Get current user's subscription status
   app.get("/api/stripe/subscription", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.userId!;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -557,7 +421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/creator - Get authenticated user's creator profile
   app.get("/api/creator", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.userId!;
       let creator = await storage.getCreatorByUserId(userId);
       
       // If no creator profile exists, create one
@@ -721,7 +585,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PUT /api/offers/:id - Update an offer
-  app.put("/api/offers/:id", async (req, res) => {
+  app.put("/api/offers/:id", async (req, res, next) => {
+    if (req.params.id === "reorder") return next();
     try {
       const offer = await storage.updateOffer(req.params.id, req.body);
       if (!offer) {

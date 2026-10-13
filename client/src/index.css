@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+.cl-formFieldInput::placeholder {
+  color: #70708b;
+  opacity: 1;
+}
+.cl-formButtonPrimary:hover { background-color: #6d28d9; }
+.cl-formFieldInput:focus { outline: 2px solid #a78bfa; outline-offset: 2px; }
+
 :root {
   --background: hsl(250, 100%, 98%);
   --foreground: hsl(240, 50%, 10%);

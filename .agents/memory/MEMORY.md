@@ -1,1 +1,2 @@
 - [Product direction](product-direction.md) — landing-page split testing is a major differentiator versus link-in-bio competitors.
+- [Sign-in direction](sign-in-direction.md) — use Clerk; no legacy linking was needed at the initial switch because there were no users.

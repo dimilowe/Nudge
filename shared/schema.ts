@@ -3,12 +3,13 @@ import { pgTable, text, varchar, jsonb, integer, timestamp, boolean, real, index
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Users table for username/password authentication
-// Note: password field stores bcrypt hash, not plaintext
+// Local app accounts. Clerk owns sign-in. The password column remains for
+// compatibility with the existing database and is empty for Clerk accounts.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clerkId: text("clerk_id").unique(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(), // Stores bcrypt hash
+  password: text("password").notNull(), // Unused for Clerk sign-in
   email: text("email"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -214,7 +215,6 @@ export const pageThemeSchema = z.object({
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  createdAt: true,
 });
 
 // Auth schemas

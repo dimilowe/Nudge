@@ -1,6 +1,5 @@
-import { Switch, Route, Link, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { Switch, Route, Link, useLocation, Redirect, Router as WouterRouter } from "wouter";
+import { ClerkAppProvider, basePath } from "@/components/ClerkAppProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -121,7 +120,7 @@ function Navigation() {
               </Button>
             </>
           ) : (
-            <Link href="/auth">
+            <Link href="/sign-in">
               <Button
                 variant="default"
                 size="sm"
@@ -140,7 +139,7 @@ function Navigation() {
 }
 
 function Router() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading, error, retry } = useAuth();
   const [location] = useLocation();
   
   if (location.startsWith('/n/')) {
@@ -149,34 +148,50 @@ function Router() {
   if (location.startsWith('/e/')) {
     return <Route path="/e/:id" component={ExperimentEntryPage} />;
   }
+  const isAuthRoute = location.startsWith("/sign-in") || location.startsWith("/sign-up") || location === "/auth";
+  const isWorkspaceRoute = ["/dashboard", "/builder", "/profile"].includes(location);
   
   return (
     <>
       <Navigation />
+      {isAuthenticated && isWorkspaceRoute && isLoading ? (
+        <div className="p-12 flex items-center justify-center gap-3"><Loader2 className="animate-spin h-5 w-5" />Loading your workspace…</div>
+      ) : isAuthenticated && !isAuthRoute && error ? (
+        <div role="alert" className="max-w-lg mx-auto p-8 space-y-4">
+          <h2 className="text-xl font-semibold">Your account could not be loaded</h2>
+          <p className="text-muted-foreground">Please retry. Your pages have not been replaced with demo data.</p>
+          <Button onClick={() => void retry()}>Try again</Button>
+        </div>
+      ) : (
       <Switch>
-        <Route path="/" component={LandingPage} />
+        <Route path="/">{isAuthenticated ? <Redirect to="/dashboard" /> : <LandingPage />}</Route>
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/builder" component={PageBuilderPage} />
         <Route path="/pricing" component={PricingPage} />
         <Route path="/feedback" component={FeedbackPage} />
-        <Route path="/auth" component={AuthPage} />
+        <Route path="/sign-in/*?"><AuthPage /></Route>
+        <Route path="/sign-up/*?"><AuthPage signUp /></Route>
+        <Route path="/auth"><Redirect to="/sign-in" /></Route>
         <Route path="/profile">
-          {isAuthenticated ? <ProfilePage /> : <AuthPage />}
+          {isAuthenticated ? <ProfilePage /> : <Redirect to="/sign-in" />}
         </Route>
         <Route component={NotFound} />
       </Switch>
+      )}
     </>
   );
 }
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <WouterRouter base={basePath}>
+    <ClerkAppProvider>
       <TooltipProvider>
         <Toaster />
         <Router />
       </TooltipProvider>
-    </QueryClientProvider>
+    </ClerkAppProvider>
+    </WouterRouter>
   );
 }
 

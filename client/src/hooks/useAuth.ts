@@ -1,5 +1,8 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
+import { useState } from "react";
+import { useUser, useClerk } from "@clerk/react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { basePath } from "@/components/ClerkAppProvider";
 
 interface AuthUser {
   id: string;
@@ -8,57 +11,32 @@ interface AuthUser {
 }
 
 export function useAuth() {
-  const { data: user, isLoading, error } = useQuery<AuthUser | null>({
-    queryKey: ["/api/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    retry: false,
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const account = useQuery<AuthUser>({
+    queryKey: ["/api/auth/me", clerkUser?.id],
+    queryFn: async () => (await apiRequest("GET", "/api/auth/me")).json(),
+    enabled: isLoaded && !!isSignedIn,
+    retry: 1,
     refetchOnWindowFocus: false,
-    refetchInterval: false,
     staleTime: 1000 * 60 * 5,
   });
-
-  const loginMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; email?: string }) => {
-      const res = await apiRequest("POST", "/api/auth/register", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/auth/logout", {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
+  const user = isSignedIn ? account.data || null : null;
   return {
     user,
-    isLoading,
-    isAuthenticated: !!user,
-    error,
-    login: loginMutation.mutateAsync,
-    register: registerMutation.mutateAsync,
-    logout: logoutMutation.mutateAsync,
-    isLoggingIn: loginMutation.isPending,
-    isRegistering: registerMutation.isPending,
-    isLoggingOut: logoutMutation.isPending,
-    loginError: loginMutation.error,
-    registerError: registerMutation.error,
+    isLoading: !isLoaded || (!!isSignedIn && account.isLoading),
+    isAuthenticated: !!isSignedIn,
+    error: isSignedIn ? account.error : null,
+    retry: account.refetch,
+    isLoggingOut,
+    logout: async () => {
+      setIsLoggingOut(true);
+      try {
+        await signOut({ redirectUrl: basePath || "/" });
+      } finally {
+        setIsLoggingOut(false);
+      }
+    },
   };
 }

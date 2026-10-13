@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="44" viewBox="0 0 150 44" role="img" aria-label="Nudg">
+  <defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#9333ea"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+  <rect x="0" y="2" width="40" height="40" rx="11" fill="url(#g)"/>
+  <path d="M20 10l3.5 8.5L32 22l-8.5 3.5L20 34l-3.5-8.5L8 22l8.5-3.5z" fill="white"/>
+  <text x="51" y="32" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#6d28d9">Nudg</text>
+</svg>

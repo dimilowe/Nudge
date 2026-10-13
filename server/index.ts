@@ -5,8 +5,17 @@ import { seedNudgeData } from "./seed/nudge-seed";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import cors from "cors";
+import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
+import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from "./middlewares/clerkProxyMiddleware";
+import { attachLocalClerkUser } from "./auth/clerk";
+import { guardCreatorResources } from "./auth/ownership";
+import { ensureClerkIdentitySchema } from "./services/clerk-accounts";
 
 const app = express();
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+app.use(cors({ credentials: true, origin: true }));
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -76,6 +85,15 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+app.use(
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
+);
+app.use("/api", attachLocalClerkUser, guardCreatorResources);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -108,6 +126,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await ensureClerkIdentitySchema();
   // Initialize Stripe
   await initStripe();
 
