@@ -897,7 +897,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/experiments/:id", async (req, res) => {
     try {
       const validated = experimentUpdateSchema.parse(req.body);
-      const experiment = await storage.updateExperiment(req.params.id, validated);
+      const current = await storage.getExperiment(req.params.id);
+      if (!current) {
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+
+      const updates: any = { ...validated };
+      if (validated.status === "running" && !current.startedAt) {
+        updates.startedAt = new Date();
+      }
+      if (validated.status === "completed" && !current.completedAt) {
+        updates.completedAt = new Date();
+      }
+
+      const experiment = await storage.updateExperiment(req.params.id, updates);
       if (!experiment) {
         return res.status(404).json({ error: "Experiment not found" });
       }
@@ -935,16 +948,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Experiment is not running" });
       }
       
-      // Randomly assign to variant based on traffic split
+      const visitorKey = String(req.query.visitorKey || "");
+      if (visitorKey.length < 8 || visitorKey.length > 200) {
+        return res.status(400).json({ error: "A valid visitor key is required" });
+      }
+
+      // Hash the persistent browser key so repeat visits remain in the same arm.
       const split = experiment.trafficSplit as { a: number; b: number; c: number };
-      const rand = Math.random() * 100;
+      let hash = 2166136261;
+      for (let i = 0; i < visitorKey.length; i += 1) {
+        hash ^= visitorKey.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const bucket = (hash >>> 0) % 10000 / 100;
       let variantIndex = 0;
       let variantPageId = experiment.variantAPageId;
       
-      if (rand < split.a) {
+      if (bucket < split.a) {
         variantIndex = 0;
         variantPageId = experiment.variantAPageId;
-      } else if (rand < split.a + split.b) {
+      } else if (bucket < split.a + split.b) {
         variantIndex = 1;
         variantPageId = experiment.variantBPageId;
       } else {
@@ -994,6 +1017,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const variantASessions = validSessions.filter(s => s.variantIndex === 0);
       const variantBSessions = validSessions.filter(s => s.variantIndex === 1);
       const variantCSessions = validSessions.filter(s => s.variantIndex === 2);
+
+      const visitorKeyFor = (session: any) => session.fingerprint || session.id;
+      const uniqueVisitorCount = (sessions: any[]) =>
+        new Set(sessions.map(visitorKeyFor)).size;
       
       // Batch-fetch all events for all sessions at once
       const allSessionIds = validSessions.map(s => s.id);
@@ -1019,11 +1046,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Group events by sessionId for fast lookup
       const conversionSessionIds = new Set(allEvents.map(e => e.sessionId));
+      const convertedVisitorsByVariant = (sessions: any[]) =>
+        new Set(
+          sessions
+            .filter((session) => conversionSessionIds.has(session.id))
+            .map(visitorKeyFor)
+        ).size;
       
       // Count conversions per variant
-      const variantAConversions = variantASessions.filter(s => conversionSessionIds.has(s.id)).length;
-      const variantBConversions = variantBSessions.filter(s => conversionSessionIds.has(s.id)).length;
-      const variantCConversions = variantCSessions.filter(s => conversionSessionIds.has(s.id)).length;
+      const variantAConversions = convertedVisitorsByVariant(variantASessions);
+      const variantBConversions = convertedVisitorsByVariant(variantBSessions);
+      const variantCConversions = convertedVisitorsByVariant(variantCSessions);
       
       // Calculate conversion rates
       const calculateRate = (conversions: number, sessions: number) => {
@@ -1036,24 +1069,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: experiment.name,
           status: experiment.status,
           targetVisitors: experiment.targetVisitors,
-          totalVisitors: validSessions.length,
+          totalVisitors: uniqueVisitorCount(validSessions),
         },
         variants: {
           a: {
             pageId: experiment.variantAPageId,
-            visitors: variantASessions.length,
+            visitors: uniqueVisitorCount(variantASessions),
             conversions: variantAConversions,
             conversionRate: calculateRate(variantAConversions, variantASessions.length),
           },
           b: {
             pageId: experiment.variantBPageId,
-            visitors: variantBSessions.length,
+            visitors: uniqueVisitorCount(variantBSessions),
             conversions: variantBConversions,
             conversionRate: calculateRate(variantBConversions, variantBSessions.length),
           },
           c: {
             pageId: experiment.variantCPageId,
-            visitors: variantCSessions.length,
+            visitors: uniqueVisitorCount(variantCSessions),
             conversions: variantCConversions,
             conversionRate: calculateRate(variantCConversions, variantCSessions.length),
           },

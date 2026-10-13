@@ -367,6 +367,7 @@ export const experimentFormSchema = z.object({
 
 export const experimentUpdateSchema = experimentFormSchema.partial().extend({
   trafficSplit: trafficSplitSchema.optional(),
+  status: z.enum(["draft", "running", "paused", "completed"]).optional(),
 });
 
 // Types
