@@ -12,3 +12,9 @@ Never assume the app uses Replit-managed PostgreSQL just because a Replit SQL qu
 **Why:** The Database pane identified an external `DATABASE_URL` even though a Replit SQL query also returned application tables, so treating the query as proof of the app’s source could have switched it away from live data.
 
 **How to apply:** Verify development and production sources independently, back up each relevant source before changing connection secrets, then validate the managed database before publishing.
+
+Keep migration backups needed across toolchain changes in a workspace directory excluded from both Git and publishing, with restrictive permissions, rather than temporary storage.
+
+**Why:** Temporary storage was reset during the PostgreSQL tooling change, so a successful export there was not a durable backup.
+
+**How to apply:** Verify the archive is readable and the exclusions are effective before changing any database connection; retain the legacy database until production is verified.

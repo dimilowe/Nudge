@@ -13,7 +13,6 @@ import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from "./mid
 import { attachLocalClerkUser } from "./auth/clerk";
 import { guardCreatorResources } from "./auth/ownership";
 import { guardBilling } from "./billing";
-import { ensureClerkIdentitySchema } from "./services/clerk-accounts";
 
 const app = express();
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
@@ -149,7 +148,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await ensureClerkIdentitySchema();
   // Initialize Stripe
   await initStripe();
 

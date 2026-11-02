@@ -3,12 +3,6 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { users, type User } from "@shared/schema";
 
-export async function ensureClerkIdentitySchema() {
-  // Additive, idempotent startup migration; existing demo data is untouched.
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id text`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_id_unique ON users (clerk_id)`);
-}
-
 export async function getClerkLocalUser(clerkId: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.clerkId, clerkId));
   return user;
