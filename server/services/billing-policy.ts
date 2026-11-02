@@ -1,6 +1,10 @@
 export const PLAN_LOOKUP_KEY = "nudg_all_access_monthly";
 export const PLAN_AMOUNT = 2200;
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 7;
+
+export function isCheckoutTrialDurationCurrent(sessionTrialDays: string | undefined, trialEligible: boolean) {
+  return sessionTrialDays === String(trialEligible ? TRIAL_DAYS : 0);
+}
 
 export interface SubscriptionSummary {
   id: string;

@@ -26,7 +26,7 @@ export default function LandingPage() {
             <Link href="/pricing">
               <Button size="lg" className="gradient-primary text-white text-lg px-8 py-6" data-testid="cta-try-free">
                 <Play className="mr-2 h-5 w-5" />
-                Start a 14-Day Trial
+                Start a 7-Day Trial
               </Button>
             </Link>
             <Link href="/pricing">
@@ -38,7 +38,7 @@ export default function LandingPage() {
           </div>
           
           <p className="text-sm text-muted-foreground">
-            No card up front. All Access is $22 USD/month after your 14-day trial.
+            No card up front. All Access is $22 USD/month after your 7-day trial.
           </p>
         </div>
       </section>
@@ -130,7 +130,7 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to Boost Your Conversions?</h2>
             <p className="text-muted-foreground mb-8">
-              Get the complete Nudg workspace for 14 days, with no card required to begin. All Access is $22 USD/month after your trial.
+              Get the complete Nudg workspace for 7 days, with no card required to begin. All Access is $22 USD/month after your trial.
             </p>
             <Link href="/pricing">
               <Button size="lg" className="gradient-primary text-white text-lg px-8 py-6" data-testid="cta-start-building">

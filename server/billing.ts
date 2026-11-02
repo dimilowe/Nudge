@@ -7,7 +7,7 @@ import { users } from "@shared/schema";
 import { storage } from "./storage";
 import { isAuthenticated } from "./auth/clerk";
 import { getUncachableStripeClient } from "./stripeClient";
-import { isCreatorBillingRoute, PLAN_AMOUNT, PLAN_LOOKUP_KEY, summarizeBilling, TRIAL_DAYS } from "./services/billing-policy";
+import { isCheckoutTrialDurationCurrent, isCreatorBillingRoute, PLAN_AMOUNT, PLAN_LOOKUP_KEY, summarizeBilling, TRIAL_DAYS } from "./services/billing-policy";
 import { billingRequestOrigin } from "./services/billing-origin";
 
 async function getPlan(stripe: Stripe) {
@@ -42,7 +42,7 @@ export async function getBillingStatus(userId: string) {
 
 export async function guardBilling(req: Request, res: Response, next: NextFunction) {
   if (!isCreatorBillingRoute(req.path, req.method, req.query)) return next();
-  if (!req.userId) return res.status(401).json({ error: "Sign in to start your 14-day trial." });
+  if (!req.userId) return res.status(401).json({ error: `Sign in to start your ${TRIAL_DAYS}-day trial.` });
   try {
     const billing = await getBillingStatus(req.userId);
     if (!billing.hasAccess) return res.status(402).json({ error: "A trial or active subscription is required.", code: "billing_required", billingUrl: "/pricing" });
@@ -75,6 +75,7 @@ async function startCheckout(userId: string, origin: string) {
     throw new Error("You already have a subscription. Use Manage billing to update it.");
   }
   const trialEligible = subscriptions.length === 0;
+  const trialDays = trialEligible ? TRIAL_DAYS : 0;
   const open = await stripe.checkout.sessions.list({ customer: customerId, limit: 100 });
   const successUrl = `${origin}/pricing?checkout=success`;
   const cancelUrl = `${origin}/pricing?checkout=canceled`;
@@ -83,7 +84,8 @@ async function startCheckout(userId: string, origin: string) {
     if (session.status !== "open" || session.metadata?.nudgUserId !== userId ||
         session.metadata.nudgPlan !== "all_access") continue;
     if (!existing && session.success_url === successUrl && session.cancel_url === cancelUrl &&
-        session.metadata.trialEligible === String(trialEligible)) {
+        session.metadata.trialEligible === String(trialEligible) &&
+        isCheckoutTrialDurationCurrent(session.metadata.trialDays, trialEligible)) {
       existing = session;
     } else {
       // An old open session may point to the other domain. Expire it before
@@ -93,7 +95,7 @@ async function startCheckout(userId: string, origin: string) {
   }
   if (existing?.url) return existing.url;
   const checkoutVersion = createHash("sha256").update(JSON.stringify({
-    origin, subscriptions: subscriptions.map(s => s.id).sort(), previous: open.data[0]?.id || null,
+    origin, trialDays, subscriptions: subscriptions.map(s => s.id).sort(), previous: open.data[0]?.id || null,
     day: new Date().toISOString().slice(0, 10),
   })).digest("hex");
   const session = await stripe.checkout.sessions.create({
@@ -103,7 +105,7 @@ async function startCheckout(userId: string, origin: string) {
     payment_method_types: ["card"],
     payment_method_collection: trialEligible ? "if_required" : "always",
     client_reference_id: userId,
-    metadata: { nudgUserId: userId, nudgPlan: "all_access", trialEligible: String(trialEligible) },
+    metadata: { nudgUserId: userId, nudgPlan: "all_access", trialEligible: String(trialEligible), trialDays: String(trialDays) },
     subscription_data: {
       metadata: { nudgUserId: userId, nudgPlan: "all_access" },
       ...(trialEligible ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } } } : {}),
@@ -111,9 +113,9 @@ async function startCheckout(userId: string, origin: string) {
     success_url: successUrl,
     cancel_url: cancelUrl,
     custom_text: { submit: { message: trialEligible
-      ? "14 days free. No card required. Add a payment method in Manage billing to continue at $22/month; otherwise your trial ends without a charge. Your published links stay live."
+      ? `${TRIAL_DAYS} days free. No card required. Add a payment method in Manage billing to continue at $22/month; otherwise your trial ends without a charge. Your published links stay live.`
       : "Nudg All Access is $22/month. Cancel anytime in Manage billing. Your published links stay live if your subscription ends." } },
-  }, { idempotencyKey: `nudg-checkout-v2-${userId}-${checkoutVersion}` });
+  }, { idempotencyKey: `nudg-checkout-v3-${userId}-${checkoutVersion}` });
   if (!session.url) throw new Error("Stripe did not return a Checkout URL.");
   return session.url;
 }

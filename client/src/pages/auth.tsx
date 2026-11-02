@@ -13,7 +13,7 @@ export default function AuthPage({ signUp = false }: { signUp?: boolean }) {
         <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up${returnQuery}`} forceRedirectUrl={returnToPricing} />
       )}
       <p className="max-w-md text-center text-sm text-muted-foreground px-4">
-        Create your account to start a 14-day trial of All Access. No card is required upfront; after your trial, All Access is $22 USD/month.
+        Create your account to start a 7-day trial of All Access. No card is required upfront; after your trial, All Access is $22 USD/month.
       </p>
     </div>
   );

@@ -904,7 +904,7 @@ export default function PageBuilderPage() {
                     <div className="space-y-4 pt-4">
                       <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                         <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
-                          All Access includes page building, offers, routing, automations, split testing, and analytics. Start with a 14-day trial; no card is required upfront.
+                          All Access includes page building, offers, routing, automations, split testing, and analytics. Start with a 7-day trial; no card is required upfront.
                         </p>
                       </div>
                       <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">

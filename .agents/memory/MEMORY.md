@@ -1,5 +1,5 @@
 - [Product direction](product-direction.md) — landing-page split testing is a major differentiator versus link-in-bio competitors.
 - [Sign-in direction](sign-in-direction.md) — use Clerk; no legacy linking was needed at the initial switch because there were no users.
-- [Pricing policy](pricing-policy.md) — one $22/month all-access plan; 14-day no-card trial; expired workspaces lock to billing while public links remain live.
+- [Pricing policy](pricing-policy.md) — one $22/month all-access plan; 7-day no-card trial; expired workspaces lock to billing while public links remain live.
 - [Webhook update safety](stripe-webhook-updates.md) — preserve managed signing secrets when updating Stripe webhook settings; update responses omit the secret.
 - [Billing domain sessions](billing-domain-sessions.md) — keep billing on the visitor’s starting host; a signed-out return is not evidence that the trial failed.

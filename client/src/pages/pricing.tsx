@@ -108,7 +108,7 @@ export default function PricingPage() {
    const requiresRepair = ["past_due", "unpaid", "paused", "incomplete", "trial_expired"].includes(status);
   const statusLabel: Record<string, string> = {
     active: "Subscription active",
-    trialing: "14-day trial",
+    trialing: "Free trial",
     past_due: "Payment needs attention",
     unpaid: "Payment overdue",
     canceled: "Subscription ended",
@@ -130,7 +130,7 @@ export default function PricingPage() {
             Make every page work harder.
           </h1>
           <p className="mx-auto max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Get the complete Nudg workspace with a 14-day trial. No card upfront. Add a payment method before your trial ends to continue at $22/month.
+              Get the complete Nudg workspace with a 7-day trial. No card upfront. Add a payment method before your trial ends to continue at $22/month.
           </p>
         </header>
 
@@ -219,7 +219,7 @@ export default function PricingPage() {
                 <h2 className="text-2xl font-bold">The full Nudg workspace</h2>
               </div>
               <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200">
-                14 days on us
+                7 days on us
               </span>
             </div>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
@@ -269,12 +269,12 @@ export default function PricingPage() {
             ) : isAuthenticated ? (
               <Button className="mt-7 h-12 w-full gradient-primary text-white sm:w-auto sm:min-w-64" onClick={requiresRepair ? openPortal : startCheckout} disabled={action !== null || !!error}>
                 {action ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {requiresRepair ? "Update payment details" : data?.trialEligible === false ? "Continue to $22/month" : "Start my 14-day trial"}
+                {requiresRepair ? "Update payment details" : data?.trialEligible === false ? "Continue to $22/month" : "Start my 7-day trial"}
                 {!action && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             ) : (
               <Button className="mt-7 h-12 w-full gradient-primary text-white sm:w-auto sm:min-w-64" onClick={startCheckout}>
-                {checkoutReturned ? "Sign in to check my trial" : "Start my 14-day trial"} <ArrowRight className="ml-2 h-4 w-4" />
+                {checkoutReturned ? "Sign in to check my trial" : "Start my 7-day trial"} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
             {locked && (
@@ -345,7 +345,7 @@ export default function PricingPage() {
                       ? "Update your payment details to restore workspace access. Your published pages remain live."
                       : data?.trialEligible === false
                         ? "Your trial isn’t available for this account. Continue to checkout for All Access at $22 USD/month."
-                      : "Start All Access for a 14-day trial. If a trial ends without payment, workspace access pauses while published pages stay live."}
+                      : "Start All Access for a 7-day trial. If a trial ends without payment, workspace access pauses while published pages stay live."}
                   </p>
                   {locked && data?.customerId && (
                     <Button variant="outline" className="mt-5 w-full" onClick={openPortal} disabled={action !== null}>
@@ -362,7 +362,7 @@ export default function PricingPage() {
               <div className="mt-4 space-y-4 text-sm">
                 <div className="flex gap-3">
                   <span className="font-mono text-xs text-purple-700 dark:text-purple-300">01</span>
-                  <p className="text-muted-foreground"><strong className="text-foreground">Try everything.</strong> Your 14-day trial includes the complete creator workspace.</p>
+                  <p className="text-muted-foreground"><strong className="text-foreground">Try everything.</strong> Your 7-day trial includes the complete creator workspace.</p>
                 </div>
                 <div className="flex gap-3">
                   <span className="font-mono text-xs text-purple-700 dark:text-purple-300">02</span>
@@ -384,7 +384,7 @@ export default function PricingPage() {
         )}
 
         <footer className="mx-auto mt-10 max-w-5xl border-t border-border/70 pt-5 text-center text-xs text-muted-foreground">
-          $22 USD per month after the 14-day trial. Billing details and subscription changes are available through billing management.
+          $22 USD per month after the 7-day trial. Billing details and subscription changes are available through billing management.
         </footer>
       </div>
     </main>

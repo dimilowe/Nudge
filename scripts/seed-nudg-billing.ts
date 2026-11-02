@@ -8,7 +8,7 @@ export async function seedNudgBilling() {
   if (!product) {
     product = await stripe.products.create({
       name: "Nudg All Access",
-      description: "All of Nudg: landing pages, offers, routing, automations, split testing and analytics. $22/month with a 14-day free trial.",
+      description: "All of Nudg: landing pages, offers, routing, automations, split testing and analytics. $22/month with a 7-day free trial.",
       metadata: { nudgPlan: "all_access" },
     }, { idempotencyKey: "nudg-all-access-product" });
   }

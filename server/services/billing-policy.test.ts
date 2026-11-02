@@ -1,10 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isCreatorBillingRoute, summarizeBilling, type SubscriptionSummary } from "./billing-policy";
+import { isCheckoutTrialDurationCurrent, isCreatorBillingRoute, summarizeBilling, TRIAL_DAYS, type SubscriptionSummary } from "./billing-policy";
 
 const subscription = (status: string, overrides: Partial<SubscriptionSummary> = {}): SubscriptionSummary => ({
   id: "sub_fixture", status, created: 100, trial_start: 100, trial_end: 1300,
   cancel_at_period_end: false, items: { data: [{ current_period_end: 2000 }] }, ...overrides,
+});
+
+test("new eligible checkouts use a seven-day trial and reject stale sessions", () => {
+  assert.equal(TRIAL_DAYS, 7);
+  assert.equal(isCheckoutTrialDurationCurrent("7", true), true);
+  assert.equal(isCheckoutTrialDurationCurrent("14", true), false);
+  assert.equal(isCheckoutTrialDurationCurrent(undefined, true), false);
+  assert.equal(isCheckoutTrialDurationCurrent("0", false), true);
+  assert.equal(isCheckoutTrialDurationCurrent("7", false), false);
 });
 
 test("new accounts have no access and are eligible for one trial", () => {
