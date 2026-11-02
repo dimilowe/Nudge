@@ -45,3 +45,6 @@ waitForPort = 5000
 
 [userenv.shared]
 BILLING_ALLOWED_ORIGINS = "https://nudg.bio,https://nudg.replit.app"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-4e6d9424-fa17-4a5c-b617-6f153b4a554b"
