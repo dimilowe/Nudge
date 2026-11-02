@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type Stripe from "stripe";
+import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -7,6 +8,7 @@ import { storage } from "./storage";
 import { isAuthenticated } from "./auth/clerk";
 import { getUncachableStripeClient } from "./stripeClient";
 import { isCreatorBillingRoute, PLAN_AMOUNT, PLAN_LOOKUP_KEY, summarizeBilling, TRIAL_DAYS } from "./services/billing-policy";
+import { billingRequestOrigin } from "./services/billing-origin";
 
 async function getPlan(stripe: Stripe) {
   const result = await stripe.prices.list({ active: true, lookup_keys: [PLAN_LOOKUP_KEY], expand: ["data.product"] });
@@ -50,15 +52,9 @@ export async function guardBilling(req: Request, res: Response, next: NextFuncti
   }
 }
 
-function baseUrl() {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0] || process.env.REPLIT_DEV_DOMAIN;
-  if (!domain) throw new Error("Application domain is unavailable.");
-  return `https://${domain}`;
-}
+const checkoutRequests = new Map<string, { origin: string; task: Promise<string> }>();
 
-const checkoutRequests = new Map<string, Promise<string>>();
-
-async function startCheckout(userId: string) {
+async function startCheckout(userId: string, origin: string) {
   const stripe = await getUncachableStripeClient();
   const price = await getPlan(stripe);
   const user = await storage.getUser(userId);
@@ -80,10 +76,26 @@ async function startCheckout(userId: string) {
   }
   const trialEligible = subscriptions.length === 0;
   const open = await stripe.checkout.sessions.list({ customer: customerId, limit: 100 });
-  const existing = open.data.find(s => s.status === "open" && s.metadata?.nudgUserId === userId &&
-    s.metadata.nudgPlan === "all_access" && s.metadata.trialEligible === String(trialEligible));
+  const successUrl = `${origin}/pricing?checkout=success`;
+  const cancelUrl = `${origin}/pricing?checkout=canceled`;
+  let existing: Stripe.Checkout.Session | undefined;
+  for (const session of open.data) {
+    if (session.status !== "open" || session.metadata?.nudgUserId !== userId ||
+        session.metadata.nudgPlan !== "all_access") continue;
+    if (!existing && session.success_url === successUrl && session.cancel_url === cancelUrl &&
+        session.metadata.trialEligible === String(trialEligible)) {
+      existing = session;
+    } else {
+      // An old open session may point to the other domain. Expire it before
+      // replacing it so it cannot later create a second subscription.
+      await stripe.checkout.sessions.expire(session.id);
+    }
+  }
   if (existing?.url) return existing.url;
-  const origin = baseUrl();
+  const checkoutVersion = createHash("sha256").update(JSON.stringify({
+    origin, subscriptions: subscriptions.map(s => s.id).sort(), previous: open.data[0]?.id || null,
+    day: new Date().toISOString().slice(0, 10),
+  })).digest("hex");
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
@@ -96,12 +108,12 @@ async function startCheckout(userId: string) {
       metadata: { nudgUserId: userId, nudgPlan: "all_access" },
       ...(trialEligible ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } } } : {}),
     },
-    success_url: `${origin}/pricing?checkout=success`,
-    cancel_url: `${origin}/pricing?checkout=canceled`,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
     custom_text: { submit: { message: trialEligible
       ? "14 days free. No card required. Add a payment method in Manage billing to continue at $22/month; otherwise your trial ends without a charge. Your published links stay live."
       : "Nudg All Access is $22/month. Cancel anytime in Manage billing. Your published links stay live if your subscription ends." } },
-  }, { idempotencyKey: `nudg-checkout-${userId}-${subscriptions.map(s => s.id).sort().join("-") || "first"}-${new Date().toISOString().slice(0, 10)}` });
+  }, { idempotencyKey: `nudg-checkout-v2-${userId}-${checkoutVersion}` });
   if (!session.url) throw new Error("Stripe did not return a Checkout URL.");
   return session.url;
 }
@@ -124,28 +136,40 @@ export function registerBillingRoutes(app: Express) {
     catch { res.status(503).json({ error: "Billing is temporarily unavailable. Please retry." }); }
   });
   app.post("/api/stripe/create-checkout", isAuthenticated, async (req, res) => {
+    let request: { origin: string; task: Promise<string> } | undefined;
+    let awaitingRequest = false;
     try {
-      let pending = checkoutRequests.get(req.userId!);
-      if (!pending) {
-        pending = startCheckout(req.userId!);
-        checkoutRequests.set(req.userId!, pending);
+      const origin = billingRequestOrigin(req.headers);
+      request = checkoutRequests.get(req.userId!);
+      if (request && request.origin !== origin) {
+        return res.status(409).json({ error: "Checkout is already opening on another Nudg domain. Please retry here in a moment." });
       }
-      res.json({ url: await pending });
+      if (!request) {
+        request = { origin, task: startCheckout(req.userId!, origin) };
+        checkoutRequests.set(req.userId!, request);
+      }
+      awaitingRequest = true;
+      res.json({ url: await request.task });
     } catch (error) {
       const message = error instanceof Error && error.message.startsWith("You already")
         ? error.message : "Live checkout is unavailable. Please retry or contact Nudg support.";
       res.status(message.startsWith("You already") ? 409 : 503).json({ error: message });
-    } finally { checkoutRequests.delete(req.userId!); }
+    } finally {
+      if (awaitingRequest && checkoutRequests.get(req.userId!) === request) {
+        checkoutRequests.delete(req.userId!);
+      }
+    }
   });
   app.post("/api/stripe/portal", isAuthenticated, async (req, res) => {
     try {
+      const origin = billingRequestOrigin(req.headers);
       const user = await storage.getUser(req.userId!);
       if (!user?.stripeCustomerId) return res.status(400).json({ error: "Start your trial before managing billing." });
       const stripe = await getUncachableStripeClient();
       const configurations = await stripe.billingPortal.configurations.list({ active: true, limit: 100 });
       const configuration = configurations.data.find(c => c.metadata?.nudgPlan === "all_access");
       if (!configuration) throw new Error("Nudg billing portal is not configured.");
-      const session = await stripe.billingPortal.sessions.create({ customer: user.stripeCustomerId, configuration: configuration.id, return_url: `${baseUrl()}/pricing` });
+      const session = await stripe.billingPortal.sessions.create({ customer: user.stripeCustomerId, configuration: configuration.id, return_url: `${origin}/pricing` });
       res.json({ url: session.url });
     } catch { res.status(503).json({ error: "Billing management is temporarily unavailable." }); }
   });

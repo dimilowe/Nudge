@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { basePath } from "@/components/ClerkAppProvider";
+import { pricingSignInUrl } from "@/lib/billing-navigation";
 import { useBilling } from "@/hooks/useBilling";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -39,7 +41,7 @@ export default function PricingPage() {
   const checkoutReturned = new URLSearchParams(window.location.search).get("checkout") === "success";
 
   useEffect(() => {
-    if (!checkoutReturned || !isAuthenticated || data?.hasAccess) {
+    if (!checkoutReturned || authLoading || !isAuthenticated || data?.hasAccess) {
       setCheckoutPending(false);
       setPollTimedOut(false);
       return;
@@ -62,11 +64,11 @@ export default function PricingPage() {
       }
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [checkoutReturned, isAuthenticated, data?.hasAccess, refetch]);
+  }, [checkoutReturned, authLoading, isAuthenticated, data?.hasAccess, refetch]);
 
   const startCheckout = async () => {
     if (!isAuthenticated) {
-      window.location.href = "/sign-up?redirect_url=%2Fpricing";
+      window.location.href = checkoutReturned ? pricingSignInUrl(basePath) : `${basePath}/sign-up?redirect_url=${encodeURIComponent(`${basePath}/pricing`)}`;
       return;
     }
     setAction("checkout");
@@ -144,28 +146,36 @@ export default function PricingPage() {
             <div className="flex items-start gap-3">
               {workspaceAccess ? (
                 <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
-              ) : checkoutPending ? (
+              ) : authLoading || checkoutPending ? (
                 <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-purple-700 dark:text-purple-300" />
               ) : (
                 <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-purple-700 dark:text-purple-300" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">
-                  {workspaceAccess
+                  {authLoading ? "Restoring your sign-in…"
+                    : !isAuthenticated ? "Sign back in to check your trial"
+                    : workspaceAccess
                     ? "Your Nudg workspace is ready."
                     : checkoutPending
                       ? "Confirming your subscription…"
                       : "Your checkout is still being confirmed."}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {workspaceAccess
+                  {authLoading ? "Please wait while we restore your account."
+                    : !isAuthenticated ? "Your checkout may already be complete. Sign in with the same account you used to start your trial so we can confirm access. You don’t need to start another trial."
+                    : workspaceAccess
                     ? "Your access is confirmed. You can head to your workspace."
                     : checkoutPending
                       ? "This usually takes a few seconds. We’ll verify access before unlocking your workspace."
                       : "We haven’t confirmed access yet. You can retry the check, or contact us if you just completed checkout."}
                 </p>
               </div>
-              {!workspaceAccess && !checkoutPending && (
+              {!authLoading && !isAuthenticated ? (
+                <Link href={pricingSignInUrl(basePath).slice(basePath.length)}>
+                  <Button size="sm">Sign in to continue</Button>
+                </Link>
+              ) : isAuthenticated && !authLoading && !workspaceAccess && !checkoutPending && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -264,7 +274,7 @@ export default function PricingPage() {
               </Button>
             ) : (
               <Button className="mt-7 h-12 w-full gradient-primary text-white sm:w-auto sm:min-w-64" onClick={startCheckout}>
-                Start my 14-day trial <ArrowRight className="ml-2 h-4 w-4" />
+                {checkoutReturned ? "Sign in to check my trial" : "Start my 14-day trial"} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
             {locked && (
@@ -288,9 +298,9 @@ export default function PricingPage() {
                 </div>
               ) : !isAuthenticated ? (
                 <>
-                  <h2 className="mt-3 text-xl font-bold">Ready when you are</h2>
+                  <h2 className="mt-3 text-xl font-bold">{checkoutReturned ? "Let’s restore your access" : "Ready when you are"}</h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Create an account to start your trial. Your card details stay out of the signup flow.
+                    {checkoutReturned ? "Use the same account as checkout. We’ll look up your existing trial after you sign in." : "Create an account to start your trial. Your card details stay out of the signup flow."}
                   </p>
                 </>
               ) : error ? (
