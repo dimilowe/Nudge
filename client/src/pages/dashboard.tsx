@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
+import { Link } from 'wouter';
+import { Button } from '@/components/ui/button';
 import { 
   TrendingUp, 
   Users, 
@@ -11,7 +13,8 @@ import {
   DollarSign,
   Smartphone,
   Monitor,
-  Tablet
+  Tablet,
+  Plus
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -84,11 +87,19 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl" data-testid="page-dashboard">
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Nudg Dashboard</h1>
-        <p className="text-lg text-muted-foreground" data-testid="text-page-description">
-          Your conversion intelligence at a glance
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-4xl font-bold mb-3 text-gradient" data-testid="text-page-title">Nudg Dashboard</h1>
+          <p className="text-lg text-muted-foreground" data-testid="text-page-description">
+            Your conversion intelligence at a glance
+          </p>
+        </div>
+        <Link href="/builder?new=1">
+          <Button className="gradient-primary w-full text-white sm:w-auto" size="lg" data-testid="button-dashboard-create-page">
+            <Plus className="mr-2 h-4 w-4" />
+            {pages.length === 0 ? 'Create your first page' : 'Create a page'}
+          </Button>
+        </Link>
       </div>
 
       {/* Key Metrics */}
@@ -256,6 +267,12 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">
               Create your first Nudg page to start converting visitors
             </p>
+            <Link href="/builder?new=1">
+              <Button className="gradient-primary mt-5 text-white" data-testid="button-empty-pages-create">
+                <Plus className="mr-2 h-4 w-4" />
+                Create your first page
+              </Button>
+            </Link>
           </div>
         )}
       </Card>

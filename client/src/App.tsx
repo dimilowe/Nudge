@@ -24,7 +24,7 @@ function Navigation() {
   const navItems = [
     { path: "/", label: "Home", icon: Sparkles, showAlways: true },
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, showAlways: true },
-    { path: "/builder", label: "Page Builder", icon: Pencil, showAlways: true },
+    { path: "/builder", label: "Page Builder", mobileLabel: "Build", icon: Pencil, showAlways: true },
     { path: "/pricing", label: "Pricing", icon: CreditCard, showAlways: true },
     { path: "/feedback", label: "Feedback", icon: MessageSquare, showAlways: true },
   ];
@@ -72,7 +72,7 @@ function Navigation() {
         
         {/* Mobile Navigation - Show key items only */}
         <div className="flex md:hidden gap-1">
-          {navItems.filter(item => ["/pricing", "/feedback"].includes(item.path)).map(item => {
+          {navItems.filter(item => ["/builder", "/pricing", "/feedback"].includes(item.path)).map(item => {
             const Icon = item.icon;
             const isActive = location === item.path;
             return (
@@ -86,7 +86,7 @@ function Navigation() {
                   data-testid={`nav-mobile-${item.label.toLowerCase().replace(' ', '-')}`}
                 >
                   <Icon className="h-3.5 w-3.5" />
-                  {item.label}
+                  {item.mobileLabel || item.label}
                 </button>
               </Link>
             );

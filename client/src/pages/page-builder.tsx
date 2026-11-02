@@ -51,7 +51,9 @@ export default function PageBuilderPage() {
   const { toast } = useToast();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-  const [showNewPageForm, setShowNewPageForm] = useState(false);
+  const [showNewPageForm, setShowNewPageForm] = useState(
+    () => new URLSearchParams(window.location.search).get('new') === '1'
+  );
   const [showNewOfferForm, setShowNewOfferForm] = useState(false);
   const [editingOffer, setEditingOffer] = useState<any | null>(null);
   const [showAutomationDialog, setShowAutomationDialog] = useState(false);
