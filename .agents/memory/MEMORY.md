@@ -4,3 +4,4 @@
 - [Webhook update safety](stripe-webhook-updates.md) — preserve managed signing secrets when updating Stripe webhook settings; update responses omit the secret.
 - [Billing domain sessions](billing-domain-sessions.md) — keep billing on the visitor’s starting host; a signed-out return is not evidence that the trial failed.
 - [Persistent page media](persistent-page-media.md) — use private App Storage and an app-serving route for public creator-page images.
+- [Database source verification](database-source-verification.md) — confirm the app’s actual connection before treating Replit database query results as its live data.
