@@ -303,6 +303,26 @@ export const routeRequestSchema = z.object({
 });
 
 // Form schemas
+const isSafeOfferImageUrl = (value: string) => {
+  if (/^\/uploads\/images\/[\w-]+\.(?:jpe?g|png|gif|webp)$/i.test(value)) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const offerImageUrlSchema = z.union([
+  z.literal(""),
+  z.string()
+    .max(2048)
+    .refine(isSafeOfferImageUrl, "Use an http(s) image URL or upload an image."),
+]).optional();
+
 export const offerFormSchema = z.object({
   pageId: z.string(),
   type: z.enum(["freebie", "digital_product", "coaching", "bundle", "affiliate", "custom"]),
@@ -310,7 +330,7 @@ export const offerFormSchema = z.object({
   description: z.string().optional(),
   cta: z.string().min(1).max(50),
   href: z.string().url(),
-  imageUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: offerImageUrlSchema,
   price: z.number().min(0).optional(),
   funnelStage: z.enum(["lead_capture", "entry", "core", "premium", "upsell"]),
   displayOrder: z.number().optional(),

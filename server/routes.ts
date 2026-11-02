@@ -7,6 +7,7 @@ import { db } from "./db";
 import { creators, offerViewTracking, visitorEvents, users } from "@shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import multer from "multer";
+import { ZodError } from "zod";
 import path from "path";
 import fs from "fs";
 import { getStripePublishableKey } from "./stripeClient";
@@ -482,8 +483,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       return res.json({ offer });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: error.issues[0]?.message || "Check the offer details and try again." });
+      }
       console.error("Offer creation error:", error);
-      return res.status(400).json({ error: "Failed to create offer" });
+      return res.status(500).json({ error: "Failed to create offer. Please try again." });
     }
   });
   

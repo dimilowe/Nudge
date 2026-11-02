@@ -47,6 +47,22 @@ import { ExperimentCard } from '@/components/ExperimentCard';
 
 const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
+function getOfferCreationErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) return 'Failed to create offer. Please try again.';
+
+  const responseBody = error.message.match(/^\d+:\s*([\s\S]+)$/)?.[1];
+  if (!responseBody) return 'Failed to create offer. Please try again.';
+
+  try {
+    const payload = JSON.parse(responseBody);
+    return typeof payload.error === 'string'
+      ? payload.error
+      : 'Failed to create offer. Please try again.';
+  } catch {
+    return 'Failed to create offer. Please try again.';
+  }
+}
+
 export default function PageBuilderPage() {
   const { toast } = useToast();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
@@ -163,8 +179,8 @@ export default function PageBuilderPage() {
       setOfferImage(undefined);
       toast({ title: 'Offer created successfully!' });
     },
-    onError: () => {
-      toast({ title: 'Failed to create offer', variant: 'destructive' });
+    onError: (error) => {
+      toast({ title: getOfferCreationErrorMessage(error), variant: 'destructive' });
     },
   });
 
