@@ -2,6 +2,7 @@ import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { isAuthenticated, registerClerkAuthRoutes, getClerkUserId } from "./auth/clerk";
+import { getAppStorageClient, getImageObjectName } from "./services/app-storage";
 import { storage } from "./storage";
 import { db } from "./db";
 import { creators, offerViewTracking, visitorEvents, users } from "@shared/schema";
@@ -9,7 +10,6 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import multer from "multer";
 import { ZodError } from "zod";
 import path from "path";
-import fs from "fs";
 import { getStripePublishableKey } from "./stripeClient";
 import { registerBillingRoutes } from "./billing";
 import {
@@ -156,24 +156,8 @@ async function evaluateRoutingRules(pageId: string, session: any): Promise<strin
   return page?.defaultOfferId || null;
 }
 
-// Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), 'uploads', 'images');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
 const upload = multer({
-  storage: imageStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -198,6 +182,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.header("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
     next();
   });
+
+  // App Storage buckets are private; serve these public page assets through the app.
+  // Keep the local static mount below as a fallback for files uploaded before migration.
+  app.get('/uploads/images/:filename', (req, res, next) => {
+    const filename = req.params.filename;
+    let imageStream: ReturnType<ReturnType<typeof getAppStorageClient>["downloadAsStream"]>;
+
+    try {
+      imageStream = getAppStorageClient().downloadAsStream(getImageObjectName(filename));
+    } catch {
+      return next();
+    }
+
+    res.type(path.extname(filename).slice(1));
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    imageStream.once("error", (error) => {
+      console.warn("App Storage image read failed:", error.message);
+      if (!res.headersSent) {
+        next();
+      } else {
+        res.destroy(error);
+      }
+    });
+    imageStream.pipe(res);
+  });
+
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   
   // CORS middleware with security-conscious origin policy
@@ -240,14 +250,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== FILE UPLOAD =====
   
   // POST /api/upload/image - Upload an image file
-  app.post("/api/upload/image", upload.single('image'), (req, res) => {
+  app.post("/api/upload/image", isAuthenticated, upload.single('image'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
-      
+
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(req.file.originalname).toLowerCase()}`;
+      const stored = await getAppStorageClient().uploadFromBytes(
+        getImageObjectName(filename),
+        req.file.buffer,
+      );
+      if (!stored.ok) {
+        console.error("Image upload to App Storage failed:", stored.error.message);
+        return res.status(503).json({ error: "Image storage is temporarily unavailable. Please try again." });
+      }
+
       // Return the URL path for the uploaded image
-      const imageUrl = `/uploads/images/${req.file.filename}`;
+      const imageUrl = `/uploads/images/${filename}`;
       return res.json({ imageUrl });
     } catch (error) {
       console.error("Image upload error:", error);

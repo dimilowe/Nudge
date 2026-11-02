@@ -3,3 +3,4 @@
 - [Pricing policy](pricing-policy.md) — one $22/month all-access plan; 7-day no-card trial; expired workspaces lock to billing while public links remain live.
 - [Webhook update safety](stripe-webhook-updates.md) — preserve managed signing secrets when updating Stripe webhook settings; update responses omit the secret.
 - [Billing domain sessions](billing-domain-sessions.md) — keep billing on the visitor’s starting host; a signed-out return is not evidence that the trial failed.
+- [Persistent page media](persistent-page-media.md) — use private App Storage and an app-serving route for public creator-page images.

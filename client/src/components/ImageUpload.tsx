@@ -32,15 +32,15 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
         body: formData,
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error(typeof data.error === 'string' ? data.error : 'Upload failed');
       }
 
-      const data = await response.json();
       onChange(data.imageUrl);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload image. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
     }
