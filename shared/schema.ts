@@ -188,12 +188,31 @@ export const overlayContentSchema = z.object({
 });
 
 // Page content schemas (versioned layout system)
+export function isSafePageCtaHref(value: string) {
+  const href = value.trim();
+  if (!href || /[\u0000-\u0020\\]/.test(href) || href.startsWith("//")) {
+    return false;
+  }
+  if (href.startsWith("/")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export const heroSectionSchema = z.object({
   type: z.literal("hero"),
   headline: z.string().default(""),
   subheadline: z.string().default(""),
   ctaText: z.string().default("Get Started"),
-  ctaHref: z.string().default(""),
+  ctaHref: z.string()
+    .default("")
+    .refine((value) => !value || isSafePageCtaHref(value), "Enter a valid HTTP(S) link."),
   heroImage: z.string().optional(),
   backgroundColor: z.string().default("gradient"), // 'gradient' | 'solid' | 'image'
   backgroundImage: z.string().optional(),

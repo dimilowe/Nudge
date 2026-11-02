@@ -39,11 +39,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import type { NudgPageFormData, OfferFormData } from '@shared/schema';
-import { nudgPageFormSchema, offerFormSchema, automationFormSchema } from '@shared/schema';
+import { nudgPageFormSchema, offerFormSchema, automationFormSchema, isSafePageCtaHref } from '@shared/schema';
 import type { z } from 'zod';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Reorder } from 'framer-motion';
 import { ExperimentCard } from '@/components/ExperimentCard';
+import { PageCtaLink } from '@/components/PageCtaLink';
 
 const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
@@ -1084,6 +1085,13 @@ export default function PageBuilderPage() {
                         <div className="mb-8 w-full max-w-md">
                           <h1 className="text-5xl font-black mb-3 tracking-tight">{contentHeadline}</h1>
                           <p className="text-lg opacity-90 font-light">{contentSubheadline}</p>
+                        </div>
+
+                        <div className="mb-8">
+                          <PageCtaLink text={contentCtaText} href={contentCtaHref} />
+                          {contentCtaText.trim() && !isSafePageCtaHref(contentCtaHref) && (
+                            <p className="mt-2 text-xs opacity-75">Add a valid link to preview this button.</p>
+                          )}
                         </div>
                         
                         {/* Top 10 Link Slots Preview */}

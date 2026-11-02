@@ -10,6 +10,7 @@ import { apiRequest } from '@/lib/queryClient';
 import useEmblaCarousel from 'embla-carousel-react';
 import { OverlayPanel } from '@/components/OverlayPanel';
 import { getVisitorId } from '@/lib/visitor-id';
+import { PageCtaLink } from '@/components/PageCtaLink';
 
 // Detect device type
 function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
@@ -838,6 +839,8 @@ export default function PublicNudgPage() {
   const headline = heroSection?.headline || page.title;
   const subheadline = heroSection?.subheadline || page.description || '';
   const heroImage = heroSection?.heroImage;
+  const ctaText = heroSection?.ctaText || '';
+  const ctaHref = heroSection?.ctaHref || '';
   const bgStyle = heroSection?.backgroundColor || 'gradient';
   const backgroundImage = heroSection?.backgroundImage;
 
@@ -907,6 +910,21 @@ export default function PublicNudgPage() {
               {subheadline}
             </p>
           )}
+        </div>
+
+        <div className="mb-12 text-center">
+          <PageCtaLink
+            text={ctaText}
+            href={ctaHref}
+            onClick={() => {
+              if (!sessionId) return;
+              trackEventMutation.mutate({
+                sessionId,
+                eventType: 'click',
+                meta: { source: 'hero_cta', href: ctaHref },
+              });
+            }}
+          />
         </div>
 
         {/* Top 10 AI-Selected Links */}
