@@ -1,4 +1,4 @@
-- [Product direction](product-direction.md) — landing-page split testing is a major differentiator versus link-in-bio competitors.
+- [Product direction](product-direction.md) — split testing differentiates Nudg; public-page “Powered by Nudg” badges support product-led growth.
 - [Sign-in direction](sign-in-direction.md) — use Clerk; no legacy linking was needed at the initial switch because there were no users.
 - [Pricing policy](pricing-policy.md) — one $22/month all-access plan; 7-day no-card trial; expired workspaces lock to billing while public links remain live.
 - [Webhook update safety](stripe-webhook-updates.md) — preserve managed signing secrets when updating Stripe webhook settings; update responses omit the secret.

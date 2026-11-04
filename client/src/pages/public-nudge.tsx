@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import useEmblaCarousel from 'embla-carousel-react';
 import { OverlayPanel } from '@/components/OverlayPanel';
@@ -1042,6 +1042,21 @@ export default function PublicNudgPage() {
             </div>
           </div>
         )}
+
+        <div className="mt-12 flex justify-center pb-2">
+          <a
+            href="/?utm_source=nudg&utm_medium=powered_by&utm_campaign=creator_pages"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="link-powered-by-nudg"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/70 bg-white px-4 py-2 text-sm font-semibold text-purple-800 shadow-lg shadow-slate-950/15 transition-transform hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple-800"
+          >
+            <span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white">
+              <Sparkles size={14} strokeWidth={2.5} />
+            </span>
+            <span>Powered by Nudg</span>
+          </a>
+        </div>
       </div>
 
       {/* Overlay Dialog (for automations) */}
