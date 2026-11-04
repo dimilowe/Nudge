@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown, BarChart3, Eye, TrendingUp, Rocket, Lock } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ExternalLink, Zap, Clock, MousePointer, ArrowDown, BarChart3, Eye, TrendingUp, Rocket, Lock, Copy, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'wouter';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -168,6 +168,43 @@ export default function PageBuilderPage() {
       toast({ title: message, variant: 'destructive' });
     },
   });
+
+  const publishPageMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPage) throw new Error('Select a page before publishing.');
+      const response = await apiRequest('PUT', `/api/pages/${selectedPage.id}`, { isPublished: true });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.page && creator?.id) {
+        queryClient.setQueryData(['/api/pages', creator.id], (current: any) =>
+          current
+            ? { ...current, pages: current.pages.map((page: any) => page.id === data.page.id ? data.page : page) }
+            : current,
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ['/api/pages', creator?.id] });
+      toast({ title: 'Page published', description: 'Your page is live and ready to share.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Unable to publish page',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const copyPublishedPageLink = async () => {
+    if (!selectedPage) return;
+    const pageUrl = new URL(`/n/${selectedPage.slug}`, window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      toast({ title: 'Page link copied' });
+    } catch {
+      toast({ title: 'Could not copy link', description: pageUrl, variant: 'destructive' });
+    }
+  };
 
   // Create offer mutation
   const createOfferMutation = useMutation({
@@ -893,44 +930,76 @@ export default function PageBuilderPage() {
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        <Rocket className="h-5 w-5 text-purple-500" />
-                        Ready to Go Live?
-                      </DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                          {selectedPage.isPublished
+                            ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            : <Rocket className="h-5 w-5 text-purple-500" />}
+                          {selectedPage.isPublished ? 'Your page is live' : 'Publish your page?'}
+                        </DialogTitle>
                       <DialogDescription>
-                        Your page is ready to be published and shared with the world!
+                        {selectedPage.isPublished
+                          ? 'Your public page is available at the link below.'
+                          : 'Confirm publishing to mark this page as live and ready to share.'}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
-                      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                        <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
-                          All Access includes page building, offers, routing, automations, split testing, and analytics. Start with a 7-day trial; no card is required upfront.
+                      <div className={`p-4 rounded-lg border ${selectedPage.isPublished
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : 'bg-muted border-border'}`}>
+                        <p className={`text-xs font-medium mb-1 ${selectedPage.isPublished
+                          ? 'text-green-700 dark:text-green-300'
+                          : 'text-muted-foreground'}`}>
+                          {selectedPage.isPublished ? 'LIVE PAGE LINK' : 'PUBLIC PAGE LINK'}
                         </p>
-                      </div>
-                      <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          Your published page will be live at: <strong>/n/{selectedPage.slug}</strong>. Published pages remain live if workspace access pauses after a trial.
+                        <p className="text-sm font-semibold break-all">
+                          {new URL(`/n/${selectedPage.slug}`, window.location.origin).toString()}
                         </p>
+                        {selectedPage.isPublished && (
+                          <p className="text-xs mt-2 text-green-700 dark:text-green-300">
+                            Published pages remain live if workspace access pauses after a trial.
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-3">
-                        <Button 
-                          variant="outline" 
-                          className="flex-1"
-                          onClick={() => setShowPublishDialog(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <a 
-                          href={`/n/${selectedPage.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1"
-                        >
-                          <Button className="w-full gradient-primary text-white" data-testid="button-view-published">
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View Live Page
-                          </Button>
-                        </a>
+                        {selectedPage.isPublished ? (
+                          <>
+                            <Button variant="outline" className="flex-1" onClick={() => void copyPublishedPageLink()}>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy Link
+                            </Button>
+                            <a
+                              href={`/n/${selectedPage.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button className="w-full gradient-primary text-white" data-testid="button-view-published">
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Open Live Page
+                              </Button>
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => setShowPublishDialog(false)}
+                              disabled={publishPageMutation.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              className="flex-1 gradient-primary text-white"
+                              onClick={() => publishPageMutation.mutate()}
+                              disabled={publishPageMutation.isPending}
+                              data-testid="button-confirm-publish"
+                            >
+                              <Rocket className="h-4 w-4 mr-2" />
+                              {publishPageMutation.isPending ? 'Publishing…' : 'Publish Page'}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </DialogContent>

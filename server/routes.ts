@@ -1197,9 +1197,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Always get automations, even if no offer is selected
       const automations = await storage.getAutomationsByPageId(page.id);
       const activeAutomations = automations.filter(a => a.isActive);
+      const automationOffers = (await Promise.all(
+        activeAutomations
+          .filter(automation => automation.offerId)
+          .map(automation => storage.getOffer(automation.offerId!)),
+      )).filter((automationOffer): automationOffer is NonNullable<typeof automationOffer> =>
+        !!automationOffer && automationOffer.pageId === page.id && automationOffer.isActive,
+      );
       
       if (!offerId) {
-        return res.json({ offer: null, automations: activeAutomations });
+        return res.json({ offer: null, automations: activeAutomations, automationOffers });
       }
       
       // Get the offer
@@ -1207,7 +1214,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json({ 
         offer, 
-        automations: activeAutomations 
+        automations: activeAutomations,
+        automationOffers,
       });
     } catch (error) {
       console.error("Routing error:", error);

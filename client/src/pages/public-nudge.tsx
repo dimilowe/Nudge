@@ -11,6 +11,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { OverlayPanel } from '@/components/OverlayPanel';
 import { getVisitorId } from '@/lib/visitor-id';
 import { PageCtaLink } from '@/components/PageCtaLink';
+import { calculateScrollDepth, getCrossedScrollMilestones } from '@/lib/scroll-depth';
 
 // Detect device type
 function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
@@ -23,6 +24,7 @@ function getDeviceType(): 'mobile' | 'desktop' | 'tablet' {
 // Track scroll depth
 function useScrollTracking(sessionId: string | null) {
   const [maxScrollDepth, setMaxScrollDepth] = useState(0);
+  const maxScrollDepthRef = useRef(0);
   const trackEventMutation = useMutation({
     mutationFn: async (event: any) => {
       return await apiRequest('/api/track/event', 'POST', event);
@@ -30,30 +32,51 @@ function useScrollTracking(sessionId: string | null) {
   });
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      maxScrollDepthRef.current = 0;
+      setMaxScrollDepth(0);
+      return;
+    }
 
-    const handleScroll = () => {
-      const scrollPercent = Math.round(
-        (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100
+    let animationFrame: number | null = null;
+    const measureScrollDepth = () => {
+      animationFrame = null;
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+      const scrollPercent = calculateScrollDepth(
+        scrollingElement.scrollTop,
+        scrollingElement.scrollHeight,
+        scrollingElement.clientHeight,
       );
-      
-      if (scrollPercent > maxScrollDepth) {
-        setMaxScrollDepth(scrollPercent);
-        
-        // Track scroll milestones
-        if ([25, 50, 75, 90].includes(scrollPercent)) {
-          trackEventMutation.mutate({
+      const previousDepth = maxScrollDepthRef.current;
+
+      if (scrollPercent <= previousDepth) return;
+
+      maxScrollDepthRef.current = scrollPercent;
+      setMaxScrollDepth(scrollPercent);
+
+      for (const milestone of getCrossedScrollMilestones(previousDepth, scrollPercent)) {
+        trackEventMutation.mutate({
             sessionId,
             eventType: 'scroll',
-            meta: { scrollDepth: scrollPercent },
+            meta: { scrollDepth: milestone },
           });
-        }
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [sessionId, maxScrollDepth]);
+    const handleScroll = () => {
+      if (animationFrame === null) {
+        animationFrame = window.requestAnimationFrame(measureScrollDepth);
+      }
+    };
+
+    document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    handleScroll();
+
+    return () => {
+      document.removeEventListener('scroll', handleScroll, true);
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+    };
+  }, [sessionId, trackEventMutation.mutate]);
 
   return maxScrollDepth;
 }
@@ -598,7 +621,12 @@ export default function PublicNudgPage() {
     enabled: !!page?.id,
   });
   
-  const offers = offersData?.offers || [];
+  const publicOffers = offersData?.offers || [];
+  const automationOffers = routeData?.automationOffers || [];
+  const offers = Array.from(
+    new Map([...publicOffers, ...automationOffers].map((item: any) => [item.id, item])).values(),
+  );
+  const visibleOffers = offers.filter((item: any) => item.isActive && !item.isHidden);
 
   // Create session mutation
   const createSessionMutation = useMutation({
@@ -845,7 +873,7 @@ export default function PublicNudgPage() {
   const backgroundImage = heroSection?.backgroundImage;
 
   // Get top 10 offers to display (prioritize routed offer first)
-  const topOffers = [...offers]
+  const topOffers = [...visibleOffers]
     .sort((a: any, b: any) => {
       // Routed offer goes first
       if (offer && a.id === offer.id) return -1;
@@ -853,7 +881,6 @@ export default function PublicNudgPage() {
       // Then sort by displayOrder
       return (a.displayOrder || 0) - (b.displayOrder || 0);
     })
-    .filter((o: any) => o.isActive)
     .slice(0, 10);
 
   // Check if background image is actually usable (not empty/whitespace/null)
@@ -983,7 +1010,7 @@ export default function PublicNudgPage() {
         )}
 
         {/* All Offers Carousel */}
-        {offers.length > 0 && (
+        {visibleOffers.length > 0 && (
           <div className="mb-12">
             <div className="flex items-center gap-2 mb-6">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
@@ -992,11 +1019,11 @@ export default function PublicNudgPage() {
               </span>
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
             </div>
-            <OffersCarousel offers={offers} onOfferClick={handleOfferClick} />
+            <OffersCarousel offers={visibleOffers} onOfferClick={handleOfferClick} />
           </div>
         )}
         
-        {offers.length === 0 && (
+        {visibleOffers.length === 0 && (
           <div className="text-center py-12">
             <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-dashed border-white/20">
               <p className="opacity-60">No links available yet.</p>
@@ -1046,7 +1073,7 @@ export default function PublicNudgPage() {
       </Dialog>
 
       {/* Floating Overlay Panel (glass-morphism style) - Always present if automations exist */}
-      {(automations.length > 0 || offers.length > 0) && (
+      {(automations.length > 0 || visibleOffers.length > 0) && (
         <OverlayPanel
           isCollapsed={floatingPanelCollapsed}
           onCollapsedChange={setFloatingPanelCollapsed}
@@ -1064,7 +1091,7 @@ export default function PublicNudgPage() {
           title={panelOffer ? "Smart Pick For You" : "Nudg"}
         >
           <OfferDeck
-            offers={offers}
+            offers={panelOffer?.isHidden ? [...visibleOffers, panelOffer] : visibleOffers}
             selectedOffer={panelOffer}
             onOfferClick={handleOfferClick}
             sessionId={sessionId}
