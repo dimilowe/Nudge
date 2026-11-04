@@ -27,7 +27,7 @@ function useScrollTracking(sessionId: string | null) {
   const maxScrollDepthRef = useRef(0);
   const trackEventMutation = useMutation({
     mutationFn: async (event: any) => {
-      return await apiRequest('/api/track/event', 'POST', event);
+      return await apiRequest('POST', '/api/track/event', event);
     },
   });
 
@@ -56,10 +56,10 @@ function useScrollTracking(sessionId: string | null) {
 
       for (const milestone of getCrossedScrollMilestones(previousDepth, scrollPercent)) {
         trackEventMutation.mutate({
-            sessionId,
-            eventType: 'scroll',
-            meta: { scrollDepth: milestone },
-          });
+          sessionId,
+          eventType: 'scroll',
+          meta: { scrollDepth: milestone },
+        });
       }
     };
 
@@ -114,7 +114,7 @@ function useTimeTracking(sessionId: string | null) {
   const [timeOnPage, setTimeOnPage] = useState(0);
   const trackEventMutation = useMutation({
     mutationFn: async (event: any) => {
-      return await apiRequest('/api/track/event', 'POST', event);
+      return await apiRequest('POST', '/api/track/event', event);
     },
   });
 
@@ -622,11 +622,6 @@ export default function PublicNudgPage() {
   });
   
   const publicOffers = offersData?.offers || [];
-  const automationOffers = routeData?.automationOffers || [];
-  const offers = Array.from(
-    new Map([...publicOffers, ...automationOffers].map((item: any) => [item.id, item])).values(),
-  );
-  const visibleOffers = offers.filter((item: any) => item.isActive && !item.isHidden);
 
   // Create session mutation
   const createSessionMutation = useMutation({
@@ -664,6 +659,11 @@ export default function PublicNudgPage() {
 
   const offer = routeData?.offer;
   const automations = routeData?.automations || [];
+  const automationOffers = routeData?.automationOffers || [];
+  const offers = Array.from(
+    new Map<string, any>([...publicOffers, ...automationOffers].map((item: any) => [item.id, item])).values(),
+  );
+  const visibleOffers = offers.filter((item: any) => item.isActive && !item.isHidden);
 
   // Start session on mount
   useEffect(() => {

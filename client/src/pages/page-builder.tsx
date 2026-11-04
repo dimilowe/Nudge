@@ -924,8 +924,10 @@ export default function PageBuilderPage() {
                 <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
                   <DialogTrigger asChild>
                     <Button className="gradient-primary text-white" data-testid="button-publish">
-                      <Rocket className="h-4 w-4 mr-2" />
-                      Publish Page
+                      {selectedPage.isPublished
+                        ? <CheckCircle2 className="h-4 w-4 mr-2" />
+                        : <Rocket className="h-4 w-4 mr-2" />}
+                      {selectedPage.isPublished ? 'Live / Share' : 'Publish Page'}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
@@ -939,7 +941,7 @@ export default function PageBuilderPage() {
                       <DialogDescription>
                         {selectedPage.isPublished
                           ? 'Your public page is available at the link below.'
-                          : 'Confirm publishing to mark this page as live and ready to share.'}
+                          : 'Your page URL is public. Confirm publishing to save its published status and get a shareable link.'}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
