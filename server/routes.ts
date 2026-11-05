@@ -160,15 +160,18 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+    const extension = path.extname(file.originalname).toLowerCase();
+    const hasHeicExtension = extension === '.heic' || extension === '.heif';
+    const hasHeicMime = /^image\/hei[cf](?:-sequence)?$/i.test(file.mimetype);
+    const isHeicMime = /^(image\/hei[cf](?:-sequence)?|application\/octet-stream)$/i.test(file.mimetype);
+    const isStandardImage =
+      /\.(?:jpe?g|png|gif|webp)$/.test(extension) &&
+      /^image\/(?:jpeg|png|gif|webp)$/i.test(file.mimetype);
+
+    if ((hasHeicExtension && isHeicMime) || (hasHeicMime && !hasHeicExtension) || isStandardImage) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
     }
+    cb(new Error('Only JPG, PNG, GIF, WebP, HEIC, and HEIF images are allowed.'));
   }
 });
 
@@ -256,10 +259,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(req.file.originalname).toLowerCase()}`;
+      let imageBuffer = req.file.buffer;
+      let extension = path.extname(req.file.originalname).toLowerCase();
+      const isHeic =
+        extension === '.heic' ||
+        extension === '.heif' ||
+        /^image\/hei[cf](?:-sequence)?$/i.test(req.file.mimetype);
+
+      if (isHeic) {
+        try {
+          const { convertHeic } = await import('heicraft');
+          const converted = await convertHeic(imageBuffer, { format: 'jpeg', quality: 0.9 });
+          if (!(converted.data instanceof Uint8Array)) {
+            throw new Error('HEIC conversion did not produce an image buffer.');
+          }
+          imageBuffer = Buffer.from(converted.data);
+          extension = '.jpg';
+        } catch (error) {
+          console.error('HEIC image conversion failed:', error);
+          return res.status(400).json({
+            error: 'Could not read this HEIC/HEIF image. Try another photo or save it as JPG.',
+          });
+        }
+      }
+
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${extension}`;
       const stored = await getAppStorageClient().uploadFromBytes(
         getImageObjectName(filename),
-        req.file.buffer,
+        imageBuffer,
       );
       if (!stored.ok) {
         console.error("Image upload to App Storage failed:", stored.error.message);

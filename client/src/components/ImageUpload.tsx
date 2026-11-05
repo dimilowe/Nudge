@@ -13,20 +13,33 @@ interface ImageUploadProps {
 export function ImageUpload({ value, onChange, label = "Upload Image", aspectRatio = "aspect-square" }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (isUploading) return;
+
+    const isHeicCandidate =
+      /\.(heic|heif)$/i.test(file.name) || /^image\/hei[cf]/i.test(file.type);
+
+    if (!file.type.startsWith('image/') && !isHeicCandidate) {
       alert('Please upload an image file');
       return;
     }
 
+    const maxFileSize = 5 * 1024 * 1024;
+    if (file.size > maxFileSize) {
+      alert('Images must be 5 MB or smaller.');
+      return;
+    }
+
     setIsUploading(true);
-    
-    const formData = new FormData();
-    formData.append('image', file);
+    setUploadStatus(isHeicCandidate ? 'Converting HEIC and uploading…' : 'Uploading image…');
 
     try {
+      const formData = new FormData();
+      formData.append('image', file);
+
       const response = await fetch('/api/upload/image', {
         method: 'POST',
         body: formData,
@@ -40,9 +53,14 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
       onChange(data.imageUrl);
     } catch (error) {
       console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
+      const defaultMessage = isHeicCandidate
+        ? 'Could not convert this HEIC image. Please try another photo or save it as JPG.'
+        : 'Failed to upload image. Please try again.';
+      alert(error instanceof Error ? error.message : defaultMessage);
     } finally {
       setIsUploading(false);
+      setUploadStatus('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -92,6 +110,16 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
               alt="Uploaded"
               className="w-full h-full object-cover"
             />
+            {isUploading && (
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 p-4 text-center text-white"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+                <p className="text-sm font-medium">{uploadStatus}</p>
+              </div>
+            )}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <Button
                 onClick={handleClick}
@@ -131,7 +159,7 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
             {isUploading ? (
               <>
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
-                <p className="text-sm text-muted-foreground">Uploading...</p>
+                <p className="text-sm text-muted-foreground">{uploadStatus || 'Uploading image…'}</p>
               </>
             ) : (
               <>
@@ -145,7 +173,7 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  PNG, JPG, GIF, or WebP
+                  PNG, JPG, GIF, WebP, HEIC, or HEIF
                 </p>
               </>
             )}
@@ -156,7 +184,7 @@ export function ImageUpload({ value, onChange, label = "Upload Image", aspectRat
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         onChange={handleFileChange}
         className="hidden"
       />
