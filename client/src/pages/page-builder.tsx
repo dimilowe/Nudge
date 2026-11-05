@@ -67,7 +67,9 @@ function getOfferCreationErrorMessage(error: unknown) {
 export default function PageBuilderPage() {
   const { toast } = useToast();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('pageId'),
+  );
   const [showNewPageForm, setShowNewPageForm] = useState(
     () => new URLSearchParams(window.location.search).get('new') === '1'
   );

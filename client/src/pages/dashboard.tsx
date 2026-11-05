@@ -14,7 +14,9 @@ import {
   Smartphone,
   Monitor,
   Tablet,
-  Plus
+  Plus,
+  ExternalLink,
+  Pencil,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -246,18 +248,54 @@ export default function DashboardPage() {
             {pages.map((page: any) => (
               <div 
                 key={page.id} 
-                className="flex items-center justify-between p-5 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 hover:shadow-lg transition-all"
+                className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 hover:shadow-lg transition-all"
                 data-testid={`card-page-${page.slug}`}
               >
-                <div>
-                  <h4 className="font-bold text-lg" data-testid={`text-page-title-${page.slug}`}>
+                <Link
+                  href={`/builder?pageId=${encodeURIComponent(page.id)}`}
+                  className="min-w-0 flex-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600 focus-visible:ring-offset-2"
+                  data-testid={`link-edit-page-${page.slug}`}
+                >
+                  <h4 className="font-bold text-lg truncate" data-testid={`text-page-title-${page.slug}`}>
                     {page.title}
                   </h4>
                   <p className="text-sm text-muted-foreground font-medium">/{page.slug}</p>
+                </Link>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <Badge className={page.isPublished ? "gradient-primary text-white border-0" : "bg-muted"}>
+                    {page.isPublished ? "Published" : "Draft"}
+                  </Badge>
+                  <Link
+                    href={`/builder?pageId=${encodeURIComponent(page.id)}`}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                    data-testid={`link-preview-editor-${page.slug}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit & Preview
+                  </Link>
+                  <a
+                    href={`/n/${encodeURIComponent(page.slug)}?preview=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
+                    data-testid={`link-preview-page-${page.slug}`}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Preview
+                  </a>
+                  {page.isPublished && (
+                    <a
+                      href={`https://nudg.bio/n/${encodeURIComponent(page.slug)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-md gradient-primary px-3 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600 focus-visible:ring-offset-2"
+                      data-testid={`link-live-page-${page.slug}`}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Live Site
+                    </a>
+                  )}
                 </div>
-                <Badge className={page.isPublished ? "gradient-primary text-white border-0" : "bg-muted"}>
-                  {page.isPublished ? "Published" : "Draft"}
-                </Badge>
               </div>
             ))}
           </div>
