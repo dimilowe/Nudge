@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
+import { DeletePageButton } from '@/components/DeletePageButton';
+import { getPublicPagePath } from '@/lib/page-url';
 import { 
   TrendingUp, 
   Users, 
@@ -274,7 +276,7 @@ export default function DashboardPage() {
                     Edit & Preview
                   </Link>
                   <a
-                    href={`/n/${encodeURIComponent(page.slug)}?preview=1`}
+                    href={`${getPublicPagePath(page.slug)}?preview=1`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
@@ -285,7 +287,7 @@ export default function DashboardPage() {
                   </a>
                   {page.isPublished && (
                     <a
-                      href={`https://nudg.bio/n/${encodeURIComponent(page.slug)}`}
+                      href={`https://nudg.bio${getPublicPagePath(page.slug)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex min-h-10 items-center gap-2 rounded-md gradient-primary px-3 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-600 focus-visible:ring-offset-2"
@@ -295,6 +297,7 @@ export default function DashboardPage() {
                       Live Site
                     </a>
                   )}
+                  <DeletePageButton page={page} creatorId={page.creatorId} />
                 </div>
               </div>
             ))}

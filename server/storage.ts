@@ -34,7 +34,7 @@ import {
   offerPerformance,
   offerViewTracking,
 } from "@shared/schema";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, or } from "drizzle-orm";
 
 export interface OfferAnalytics {
   offerId: string;
@@ -208,8 +208,68 @@ export class DbStorage implements IStorage {
   }
 
   async deleteNudgPage(id: string): Promise<boolean> {
-    const result = await db.delete(nudgPages).where(eq(nudgPages.id, id)).returning();
-    return result.length > 0;
+    return db.transaction(async (tx) => {
+      const [page] = await tx.select({ id: nudgPages.id }).from(nudgPages).where(eq(nudgPages.id, id));
+      if (!page) return false;
+
+      const pageOffers = await tx.select({ id: offers.id }).from(offers).where(eq(offers.pageId, id));
+      const offerIds = pageOffers.map((offer) => offer.id);
+      const pageExperiments = await tx
+        .select({ id: experiments.id })
+        .from(experiments)
+        .where(or(
+          eq(experiments.variantAPageId, id),
+          eq(experiments.variantBPageId, id),
+          eq(experiments.variantCPageId, id),
+        ));
+      const experimentIds = pageExperiments.map((experiment) => experiment.id);
+
+      const sessionFilter = experimentIds.length
+        ? or(eq(visitorSessions.pageId, id), inArray(visitorSessions.experimentId, experimentIds))
+        : eq(visitorSessions.pageId, id);
+      const pageSessions = await tx
+        .select({ id: visitorSessions.id })
+        .from(visitorSessions)
+        .where(sessionFilter);
+      const sessionIds = pageSessions.map((session) => session.id);
+
+      if (sessionIds.length) {
+        await tx.delete(visitorEvents).where(inArray(visitorEvents.sessionId, sessionIds));
+      }
+
+      const trackingFilters = [];
+      if (sessionIds.length) trackingFilters.push(inArray(offerViewTracking.sessionId, sessionIds));
+      if (offerIds.length) trackingFilters.push(inArray(offerViewTracking.offerId, offerIds));
+      if (trackingFilters.length) {
+        await tx.delete(offerViewTracking).where(or(...trackingFilters));
+      }
+      if (offerIds.length) {
+        await tx.delete(offerPerformance).where(inArray(offerPerformance.offerId, offerIds));
+      }
+
+      const routingFilters = [eq(routingRules.pageId, id)];
+      if (offerIds.length) routingFilters.push(inArray(routingRules.offerId, offerIds));
+      await tx.delete(routingRules).where(or(...routingFilters));
+      const automationFilters = [eq(automations.pageId, id)];
+      if (offerIds.length) automationFilters.push(inArray(automations.offerId, offerIds));
+      await tx.delete(automations).where(or(...automationFilters));
+
+      if (experimentIds.length) {
+        await tx.delete(experiments).where(inArray(experiments.id, experimentIds));
+      }
+      if (sessionIds.length) {
+        await tx.delete(visitorSessions).where(inArray(visitorSessions.id, sessionIds));
+      }
+      if (offerIds.length) {
+        await tx.update(nudgPages)
+          .set({ defaultOfferId: null })
+          .where(inArray(nudgPages.defaultOfferId, offerIds));
+        await tx.delete(offers).where(inArray(offers.id, offerIds));
+      }
+
+      const result = await tx.delete(nudgPages).where(eq(nudgPages.id, id)).returning();
+      return result.length > 0;
+    });
   }
 
   // Offers

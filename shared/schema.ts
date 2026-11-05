@@ -368,11 +368,29 @@ export const automationFormSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const reservedRootPageSlugs = new Set([
+  "dashboard",
+  "builder",
+  "pricing",
+  "feedback",
+  "sign-in",
+  "sign-up",
+  "auth",
+  "profile",
+  "api",
+  "n",
+  "e",
+  "uploads",
+]);
+
 export const nudgPageFormSchema = z.object({
   creatorId: z.string(),
   title: z.string().min(1).max(100),
   description: z.string().optional(),
-  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/).refine(
+    (slug) => !reservedRootPageSlugs.has(slug),
+    { message: "That URL is reserved for Nudg. Choose a different page URL." },
+  ),
 });
 
 export const pageContentUpdateSchema = z.object({

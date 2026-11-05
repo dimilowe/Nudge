@@ -45,6 +45,8 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { Reorder } from 'framer-motion';
 import { ExperimentCard } from '@/components/ExperimentCard';
 import { PageCtaLink } from '@/components/PageCtaLink';
+import { DeletePageButton } from '@/components/DeletePageButton';
+import { getPublicPagePath, getPublicPageUrl } from '@/lib/page-url';
 
 const NONE_VALUE = '__none__'; // Sentinel for optional offerId
 
@@ -199,7 +201,7 @@ export default function PageBuilderPage() {
 
   const copyPublishedPageLink = async () => {
     if (!selectedPage) return;
-    const pageUrl = new URL(`/n/${selectedPage.slug}`, window.location.origin).toString();
+    const pageUrl = getPublicPageUrl(selectedPage.slug, window.location.origin);
     try {
       await navigator.clipboard.writeText(pageUrl);
       toast({ title: 'Page link copied' });
@@ -892,19 +894,29 @@ export default function PageBuilderPage() {
 
           <div className="space-y-2">
             {pages.map((page: any) => (
-              <button
-                key={page.id}
-                onClick={() => setSelectedPageId(page.id)}
-                className={`w-full text-left p-3 rounded-lg transition-all ${
-                  selectedPageId === page.id
-                    ? 'gradient-primary text-white'
-                    : 'hover:bg-muted'
-                }`}
-                data-testid={`button-page-${page.slug}`}
-              >
-                <div className="font-medium">{page.title}</div>
-                <div className={`text-sm ${selectedPageId === page.id ? 'opacity-80' : 'text-muted-foreground'}`}>/{page.slug}</div>
-              </button>
+              <div key={page.id} className="flex items-center gap-1">
+                <button
+                  onClick={() => setSelectedPageId(page.id)}
+                  className={`min-w-0 flex-1 text-left p-3 rounded-lg transition-all ${
+                    selectedPageId === page.id
+                      ? 'gradient-primary text-white'
+                      : 'hover:bg-muted'
+                  }`}
+                  data-testid={`button-page-${page.slug}`}
+                >
+                  <div className="truncate font-medium">{page.title}</div>
+                  <div className={`truncate text-sm ${selectedPageId === page.id ? 'opacity-80' : 'text-muted-foreground'}`}>/{page.slug}</div>
+                </button>
+                <DeletePageButton
+                  page={page}
+                  creatorId={page.creatorId}
+                  onDeleted={() => {
+                    if (selectedPageId === page.id) {
+                      setSelectedPageId(pages.find((candidate: any) => candidate.id !== page.id)?.id ?? null);
+                    }
+                  }}
+                />
+              </div>
             ))}
             {pages.length === 0 && !showNewPageForm && (
               <p className="text-sm text-muted-foreground text-center py-6">
@@ -956,7 +968,7 @@ export default function PageBuilderPage() {
                           {selectedPage.isPublished ? 'LIVE PAGE LINK' : 'PUBLIC PAGE LINK'}
                         </p>
                         <p className="text-sm font-semibold break-all">
-                          {new URL(`/n/${selectedPage.slug}`, window.location.origin).toString()}
+                          {getPublicPageUrl(selectedPage.slug, window.location.origin)}
                         </p>
                         {selectedPage.isPublished && (
                           <p className="text-xs mt-2 text-green-700 dark:text-green-300">
@@ -972,7 +984,7 @@ export default function PageBuilderPage() {
                               Copy Link
                             </Button>
                             <a
-                              href={`/n/${selectedPage.slug}`}
+                              href={getPublicPagePath(selectedPage.slug)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex-1"

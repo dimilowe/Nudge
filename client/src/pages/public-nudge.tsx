@@ -584,7 +584,7 @@ function OffersCarousel({ offers, onOfferClick }: { offers: any[]; onOfferClick:
 }
 
 export default function PublicNudgPage() {
-  const [, params] = useRoute('/n/:slug');
+  const [, params] = useRoute('/:slug');
   const slug = params?.slug || '';
   
   const [sessionId, setSessionId] = useState<string | null>(null);

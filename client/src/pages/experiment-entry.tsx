@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getVisitorId } from "@/lib/visitor-id";
+import { getPublicPagePath } from "@/lib/page-url";
 
 export default function ExperimentEntryPage() {
   const [, params] = useRoute("/e/:id");
@@ -35,7 +36,7 @@ export default function ExperimentEntryPage() {
       query.set("variantIndex", String(data.variantIndex));
     }
     const search = query.toString();
-    navigate(`/n/${encodeURIComponent(data.pageSlug)}${search ? `?${search}` : ""}`, { replace: true });
+    navigate(`${getPublicPagePath(data.pageSlug)}${search ? `?${search}` : ""}`, { replace: true });
   }, [data, navigate]);
 
   return (

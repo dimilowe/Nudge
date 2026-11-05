@@ -16,6 +16,7 @@ import { LayoutDashboard, Sparkles, Pencil, MessageSquare, CreditCard, UserCircl
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { WorkspaceAccess } from "@/components/WorkspaceAccess";
+import { reservedRootPageSlugs } from "@shared/schema";
 
 function Navigation() {
   const [location] = useLocation();
@@ -142,15 +143,24 @@ function Navigation() {
 function Router() {
   const { isAuthenticated, isLoading, error, retry } = useAuth();
   const [location] = useLocation();
-  
-  if (location.startsWith('/n/')) {
-    return <Route path="/n/:slug"><PublicNudgPage key={location} /></Route>;
+
+  const pathname = location.split(/[?#]/, 1)[0];
+  const legacyPageSlug = pathname.match(/^\/n\/([a-z0-9-]+)$/)?.[1];
+  if (legacyPageSlug) {
+    return <Redirect to={`/${legacyPageSlug}${window.location.search}${window.location.hash}`} replace />;
   }
-  if (location.startsWith('/e/')) {
+  if (pathname.startsWith('/n/')) {
+    return <NotFound />;
+  }
+  if (pathname.startsWith('/e/')) {
     return <Route path="/e/:id" component={ExperimentEntryPage} />;
   }
-  const isAuthRoute = location.startsWith("/sign-in") || location.startsWith("/sign-up") || location === "/auth";
-  const isWorkspaceRoute = ["/dashboard", "/builder", "/profile"].includes(location);
+  const rootPageSlug = pathname.match(/^\/([a-z0-9-]+)$/)?.[1];
+  if (rootPageSlug && !reservedRootPageSlugs.has(rootPageSlug)) {
+    return <Route path="/:slug"><PublicNudgPage key={pathname} /></Route>;
+  }
+  const isAuthRoute = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up") || pathname === "/auth";
+  const isWorkspaceRoute = ["/dashboard", "/builder", "/profile"].includes(pathname);
   
   return (
     <>

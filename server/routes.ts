@@ -431,7 +431,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/pages - Create a new page
   app.post("/api/pages", async (req, res) => {
     try {
-      const validated = nudgPageFormSchema.parse(req.body);
+      const parsed = nudgPageFormSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: parsed.error.issues[0]?.message || "Invalid page details",
+        });
+      }
+      const validated = parsed.data;
       
       // Check if slug already exists
       const existingPage = await storage.getNudgPageBySlug(validated.slug);
@@ -480,8 +486,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // DELETE /api/pages/:id - Delete a page
-  app.delete("/api/pages/:id", async (req, res) => {
+  app.delete("/api/pages/:id", isAuthenticated, async (req, res) => {
     try {
+      const page = await storage.getNudgPage(req.params.id);
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+      const creator = await storage.getCreator(page.creatorId);
+      if (!creator || creator.userId !== req.userId) {
+        return res.status(403).json({ error: "You do not have permission to delete this page" });
+      }
+
       const success = await storage.deleteNudgPage(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Page not found" });

@@ -20,3 +20,9 @@ Dashboard page rows should link directly to the selected page's editor preview a
 **Why:** The user wants to open the exact landing page they are working on without searching for it in the builder.
 
 **How to apply:** Keep preview and live-page actions easy to find on each page row.
+
+Public page URLs should use root-level slugs; retain redirects from legacy `/n/<slug>` links.
+
+**Why:** The user wants shorter creator links and is prepared to replace existing live links.
+
+**How to apply:** Generate new links as `/<slug>`, preserve the old route as a redirect, and reserve Nudg's own route names.
